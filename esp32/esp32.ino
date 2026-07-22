@@ -3,19 +3,27 @@
 #include <ESP32Servo.h>
 #include <ArduinoJson.h>
 
+//// Defines pins
+#define PAN_PIN 12
+#define TILT_PIN 16
+#define TRIGGER_PIN 13
+#define RELOAD1_PIN 26
+#define RELOAD2_PIN 27
+
+// Define Constans
+#define PAN_MIN 0
+#define PAN_MAX 180
+#define TILT_MIN 30
+#define TILT_MAX 150
+
 using namespace websockets;
 
 // ---------- WiFi / Server config ----------
-const char *ssid = "LINDASHAMBA";
-const char *pass = "lindashamba";
+const char *ssid = "Ithink";
+const char *pass = "Ilove2capples";
 const char *wsServer = "ws://your-server-address/ws";  // use ws:// not http://
 
 WebsocketsClient client;
-
-// ---------- Turret hardware config ----------
-const int PAN_PIN = 13;
-const int TILT_PIN = 12;
-const int SHOOT_PIN = 14;  // relay/MOSFET controlling pump or flywheel motor
 
 Servo panServo;
 Servo tiltServo;
@@ -23,8 +31,6 @@ Servo tiltServo;
 int panAngle = 90;   // center position
 int tiltAngle = 90;  // center position
 
-const int PAN_MIN = 0, PAN_MAX = 180;
-const int TILT_MIN = 30, TILT_MAX = 150;  // adjust to your rig's safe range
 
 bool isShooting = false;
 unsigned long shootStartTime = 0;
@@ -61,7 +67,7 @@ void setTilt(int angle) {
 
 // Non-blocking shoot: turn on now, loop() turns it off after SHOOT_DURATION_MS
 void startShoot() {
-  digitalWrite(SHOOT_PIN, HIGH);
+  digitalWrite(TRIGGER_PIN, HIGH);
   isShooting = true;
   shootStartTime = millis();
   Serial.println("Shoot triggered");
@@ -69,7 +75,7 @@ void startShoot() {
 
 void updateShoot() {
   if (isShooting && (millis() - shootStartTime >= SHOOT_DURATION_MS)) {
-    digitalWrite(SHOOT_PIN, LOW);
+    digitalWrite(TRIGGER_PIN, LOW);
     isShooting = false;
     Serial.println("Shoot released");
   }
@@ -96,23 +102,17 @@ void handleCommand(const String &msg) {
   int angle = doc[1].as<int>();
   bool shootFlag = doc[2].as<bool>();
 
-  switch (direction) {
-    case "LEFT":
-      setPan(panAngle - angle);
-      break;
-    case "RIGHT":
-      setPan(panAngle + angle);
-      break;
-    case "UP":
-      setTilt(tiltAngle + angle);
-      break;
-    case "DOWN":
-      setTilt(tiltAngle - angle);
-      break;
-    default:
-      Serial.println("Unrecognized direction: " + direction);
+  if (direction == "LEFT") {
+    setPan(panAngle - angle);
+  } else if (direction == "RIGHT") {
+    setPan(panAngle + angle);
+  } else if (direction == "UP") {
+    setTilt(tiltAngle + angle);
+  } else if (direction == "DOWN") {
+    setTilt(tiltAngle - angle);
+  } else {
+    Serial.println("Unrecognized direction: " + direction);
   }
-
   if (shootFlag) {
     startShoot();
   }
@@ -152,8 +152,8 @@ void setup() {
   setTilt(tiltAngle);
 
   // Shoot pin setup
-  pinMode(SHOOT_PIN, OUTPUT);
-  digitalWrite(SHOOT_PIN, LOW);
+  pinMode(TRIGGER_PIN, OUTPUT);
+  digitalWrite(TRIGGER_PIN, LOW);
 
   // WiFi + Websocket setup
   connectToWifi();
