@@ -1,0 +1,11 @@
+[project]
+name = "animal-classification"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "opencv-python>=5.0.0.93",
+    "ultralytics>=8.4.104",
+    "websockets>=16.1.1",
+]
