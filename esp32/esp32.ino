@@ -38,10 +38,12 @@ enum GunState { IDLE,
                 SHOOTING,
                 RELOAD_DELAY_1,
                 RELOAD_DELAY_2,
-                RELOAD_DELAY_3 };
+                RELOAD_DELAY_3,
+                COOLDOWN };
 GunState gunState = IDLE;
 unsigned long stateStartTime = 0;
-const int SHOOT_DURATION_MS = 500;  // how long the trigger stays on per "true"
+const int SHOOT_DURATION_MS = 500;      // how long the trigger stays on per "true"
+const int COOLDOWN_DURATION_MS = 2000;  // adjust this to taste
 
 // ---------- WiFi setup ----------
 void connectToWifi() {
@@ -89,20 +91,25 @@ void updateGun() {
   if (gunState == SHOOTING && (now - stateStartTime >= SHOOT_DURATION_MS)) {
     trigger.write(TRIGGER_START_POINT);
     Serial.println("starting reload");
-    digitalWrite(RELOAD2_PIN, HIGH);  // Phase 1: reloadPin2 ON
+    digitalWrite(RELOAD2_PIN, HIGH);
     gunState = RELOAD_DELAY_1;
     stateStartTime = now;
 
   } else if (gunState == RELOAD_DELAY_1 && (now - stateStartTime >= 750)) {
-    digitalWrite(RELOAD2_PIN, LOW);   // Phase 1 done
-    digitalWrite(RELOAD1_PIN, HIGH);  // Phase 2: reloadPin1 ON
+    digitalWrite(RELOAD2_PIN, LOW);
+    digitalWrite(RELOAD1_PIN, HIGH);
     gunState = RELOAD_DELAY_2;
     stateStartTime = now;
 
   } else if (gunState == RELOAD_DELAY_2 && (now - stateStartTime >= 240)) {
-    digitalWrite(RELOAD1_PIN, LOW);  // Phase 2 done
+    digitalWrite(RELOAD1_PIN, LOW);
+    Serial.println("reload complete, cooling down");
+    gunState = COOLDOWN;
+    stateStartTime = now;
+
+  } else if (gunState == COOLDOWN && (now - stateStartTime >= COOLDOWN_DURATION_MS)) {
     gunState = IDLE;
-    Serial.println("reload complete");
+    Serial.println("ready to shoot");
   }
 }
 
