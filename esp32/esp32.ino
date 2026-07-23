@@ -85,22 +85,22 @@ void shoot() {
 
 void updateGun() {
   unsigned long now = millis();
+
   if (gunState == SHOOTING && (now - stateStartTime >= SHOOT_DURATION_MS)) {
     trigger.write(TRIGGER_START_POINT);
-    Serial.println("staring reload");
-    digitalWrite(RELOAD1_PIN, HIGH);
+    Serial.println("starting reload");
+    digitalWrite(RELOAD2_PIN, HIGH);  // Phase 1: reloadPin2 ON
     gunState = RELOAD_DELAY_1;
     stateStartTime = now;
-  } else if (gunState == RELOAD_DELAY_1 && (now - stateStartTime >= 1000)) {
-    digitalWrite(RELOAD1_PIN, LOW);
-    digitalWrite(RELOAD1_PIN, HIGH);
+
+  } else if (gunState == RELOAD_DELAY_1 && (now - stateStartTime >= 750)) {
+    digitalWrite(RELOAD2_PIN, LOW);   // Phase 1 done
+    digitalWrite(RELOAD1_PIN, HIGH);  // Phase 2: reloadPin1 ON
     gunState = RELOAD_DELAY_2;
     stateStartTime = now;
-  } else if (gunState == RELOAD_DELAY_2 && (now - stateStartTime >= 1000)) {
-    digitalWrite(RELOAD1_PIN, LOW);
-    gunState = RELOAD_DELAY_3;
-    stateStartTime = now;
-  } else if (gunState == RELOAD_DELAY_3 && (now - stateStartTime >= 2000)) {
+
+  } else if (gunState == RELOAD_DELAY_2 && (now - stateStartTime >= 240)) {
+    digitalWrite(RELOAD1_PIN, LOW);  // Phase 2 done
     gunState = IDLE;
     Serial.println("reload complete");
   }
@@ -214,7 +214,7 @@ void setup() {
   // 1. Reset trigger to rest position first
   trigger.attach(TRIGGER_PIN);
   trigger.write(TRIGGER_START_POINT);
-  delay(300); // give servo time to reach position before moving on
+  delay(300);  // give servo time to reach position before moving on
 
   // 2. Init pan servo and run dummy panning routine
   ESP32PWM::allocateTimer(0);
