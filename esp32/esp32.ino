@@ -24,9 +24,9 @@ const char *pass = "Ilove2capples";
 const char *wsServer = "ws://your-server-address/ws";  // use ws:// not http://
 
 WebsocketsClient client;
-
 Servo panServo;
 Servo tiltServo;
+Servo trigger;
 
 int panAngle = 90;   // center position
 int tiltAngle = 90;  // center position
@@ -142,18 +142,61 @@ void onEventCallback(WebsocketsEvent event, String data) {
   }
 }
 
+const int stopValue = 90;  // Calibrate this for your specific servo
+
+// Smoothly ramp servo speed from one value to another over a duration
+void rampServo(Servo &servo, int fromSpeed, int toSpeed, int durationMs) {
+  int steps = 7;  // Number of increments for smoothness
+  int stepDelay = durationMs / steps;
+
+  for (int i = 0; i <= steps; i++) {
+    int value = fromSpeed + ((toSpeed - fromSpeed) * i) / steps;
+    servo.write(value);
+    delay(stepDelay);
+  }
+}
+
+void dummyPanning() {
+  // Ramp up to pan right (slow start)
+  rampServo(panServo, stopValue, 60, 400);
+  delay(800);  // Hold at panning speed (simulates steady pan)
+
+  // Ramp down to a stop (slow finish, like settling on a subject)
+  rampServo(panServo, 60, stopValue, 400);
+  delay(600);  // Pause, as if "looking" at something
+
+  // Ramp up to pan left
+  rampServo(panServo, stopValue, 120, 400);
+  delay(1000);  // Hold — longer pan this direction
+
+  // Ramp down to a stop
+  rampServo(panServo, 120, stopValue, 400);
+  delay(500);  // Pause again
+
+  // Quick small pan back toward center (like a subtle re-adjustment)
+  rampServo(panServo, stopValue, 75, 200);
+  delay(300);
+  rampServo(panServo, 75, stopValue, 200);
+}
+
 void setup() {
   Serial.begin(115200);
 
-  // Servo setup
-  panServo.attach(PAN_PIN);
-  tiltServo.attach(TILT_PIN);
-  setPan(panAngle);
-  setTilt(tiltAngle);
+  ////REload Pins setup
+  pinMode(RELOAD1_PIN, OUTPUT);
+  pinMode(RELOAD2_PIN, OUTPUT);
 
-  // Shoot pin setup
-  pinMode(TRIGGER_PIN, OUTPUT);
-  digitalWrite(TRIGGER_PIN, LOW);
+  // Dummy paning
+  ESP32PWM::allocateTimer(0);
+  ESP32PWM::allocateTimer(1);
+  ESP32PWM::allocateTimer(2);
+  ESP32PWM::allocateTimer(3);
+
+  panServo.setPeriodHertz(50);
+  panServo.attach(PAN_PIN, 500, 2400);
+  trigger.attach(TRIGGER_PIN);
+
+  dummyPanning();
 
   // WiFi + Websocket setup
   connectToWifi();
@@ -162,12 +205,28 @@ void setup() {
 
   client.onMessage(onMessageCallback);
   client.onEvent(onEventCallback);
+
   client.connect(wsServer);
   client.send("hello master!");
   client.ping();
 }
 
 void loop() {
+  // // PULL Trigger
+  // trigger.write(70);
+  // delay(500);
+  // trigger.write(0);
+  // delay(300);
+  //
+  // // reload
+  // digitalWrite(RELOAD1_PIN, HIGH);
+  // delay(1000);
+  // digitalWrite(RELOAD1_PIN, LOW);
+  // digitalWrite(RELOAD1_PIN, HIGH);
+  // delay(1000);
+  // digitalWrite(RELOAD1_PIN, LOW);
+  // delay(1500);
+
   client.poll();
   updateShoot();
 }
