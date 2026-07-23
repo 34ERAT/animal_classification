@@ -32,9 +32,10 @@ int panAngle = 90;   // center position
 int tiltAngle = 90;  // center position
 
 
-bool isShooting = false;
-unsigned long shootStartTime = 0;
-const int SHOOT_DURATION_MS = 300;  // how long the trigger stays on per "true"
+enum GunState { IDLE, SHOOTING, RELOAD_DELAY_1, RELOAD_DELAY_2, RELOAD_DELAY_3 };
+GunState gunState = IDLE;
+unsigned long stateStartTime = 0;
+const int SHOOT_DURATION_MS = 500;  // how long the trigger stays on per "true"
 
 // ---------- WiFi setup ----------
 void connectToWifi() {
@@ -65,29 +66,37 @@ void setTilt(int angle) {
   Serial.printf("Tilt set to %d\n", tiltAngle);
 }
 
-// Non-blocking shoot: turn on now, loop() turns it off after SHOOT_DURATION_MS
+// Non-blocking shoot: turn on now, updateGun() turns it off
 void shoot() {
+  if (gunState != IDLE) {
+    return; // Ignore if already shooting or reloading
+  }
   trigger.write(45);
-  isShooting = true;
-  shootStartTime = millis();
+  gunState = SHOOTING;
+  stateStartTime = millis();
   Serial.println("trigger pullled");
-  delay(500);
 }
 
-void reloadGun() {
-  if (isShooting && (millis() - shootStartTime >= SHOOT_DURATION_MS)) {
+void updateGun() {
+  unsigned long now = millis();
+  if (gunState == SHOOTING && (now - stateStartTime >= SHOOT_DURATION_MS)) {
     trigger.write(0);
-    isShooting = false;
     Serial.println("staring reload");
-
-    // reload
     digitalWrite(RELOAD1_PIN, HIGH);
-    delay(1000);
+    gunState = RELOAD_DELAY_1;
+    stateStartTime = now;
+  } else if (gunState == RELOAD_DELAY_1 && (now - stateStartTime >= 1000)) {
     digitalWrite(RELOAD1_PIN, LOW);
     digitalWrite(RELOAD1_PIN, HIGH);
-    delay(1000);
+    gunState = RELOAD_DELAY_2;
+    stateStartTime = now;
+  } else if (gunState == RELOAD_DELAY_2 && (now - stateStartTime >= 1000)) {
     digitalWrite(RELOAD1_PIN, LOW);
-    delay(2000);
+    gunState = RELOAD_DELAY_3;
+    stateStartTime = now;
+  } else if (gunState == RELOAD_DELAY_3 && (now - stateStartTime >= 2000)) {
+    gunState = IDLE;
+    Serial.println("reload complete");
   }
 }
 
@@ -223,5 +232,5 @@ void setup() {
 
 void loop() {
   client.poll();
-  reloadGun();
+  updateGun();
 }
