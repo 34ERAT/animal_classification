@@ -1,5 +1,6 @@
 import config
 
+
 class TurretController:
     def compute_pid_speeds(self, cx, cy):
         errorX = cx - config.CAMERA_CENTER_X
@@ -22,13 +23,24 @@ class TurretController:
         # Prioritize whichever axis is more off-center
         if abs(offset_x) >= abs(offset_y) and abs(offset_x) > config.CENTER_TOLERANCE_X:
             direction = "RIGHT" if offset_x > 0 else "LEFT"
-            angle = min(config.MAX_ANGLE_STEP, int(abs(offset_x) / config.CAMERA_CENTER_X * config.MAX_ANGLE_STEP) + 1)
+            angle = min(
+                config.MAX_ANGLE_STEP,
+                int(abs(offset_x) / config.CAMERA_CENTER_X * config.MAX_ANGLE_STEP) + 1,
+            )
         elif abs(offset_y) > config.CENTER_TOLERANCE_Y:
             direction = "DOWN" if offset_y > 0 else "UP"
-            angle = min(config.MAX_ANGLE_STEP, int(abs(offset_y) / config.CAMERA_CENTER_Y * config.MAX_ANGLE_STEP) + 1)
+            angle = min(
+                config.MAX_ANGLE_STEP,
+                int(abs(offset_y) / config.CAMERA_CENTER_Y * config.MAX_ANGLE_STEP) + 1,
+            )
         else:
             # Already centered, no movement needed
             direction = "LEFT"
             angle = 0
 
-        return [direction, angle, True]
+        locked_on = (
+            abs(offset_x) <= config.CENTER_TOLERANCE_X
+            and abs(offset_y) <= config.CENTER_TOLERANCE_Y
+        )
+
+        return [direction, angle, locked_on]

@@ -207,24 +207,27 @@ void dummyPanning() {
 void setup() {
   Serial.begin(115200);
 
-  ////REload Pins setup
+  //// Reload Pins setup
   pinMode(RELOAD1_PIN, OUTPUT);
   pinMode(RELOAD2_PIN, OUTPUT);
 
+  // 1. Reset trigger to rest position first
   trigger.attach(TRIGGER_PIN);
   trigger.write(TRIGGER_START_POINT);
-  // // Dummy paning
-  // ESP32PWM::allocateTimer(0);
-  // ESP32PWM::allocateTimer(1);
-  // ESP32PWM::allocateTimer(2);
-  // ESP32PWM::allocateTimer(3);
-  //
-  // panServo.setPeriodHertz(50);
-  // panServo.attach(PAN_PIN, 500, 2400);
-  //
-  // dummyPanning();
+  delay(300); // give servo time to reach position before moving on
 
-  // WiFi + Websocket setup
+  // 2. Init pan servo and run dummy panning routine
+  ESP32PWM::allocateTimer(0);
+  ESP32PWM::allocateTimer(1);
+  ESP32PWM::allocateTimer(2);
+  ESP32PWM::allocateTimer(3);
+
+  panServo.setPeriodHertz(50);
+  panServo.attach(PAN_PIN, 500, 2400);
+
+  dummyPanning();
+
+  // 3. WiFi + Websocket setup
   connectToWifi();
   Serial.println("WiFi connection successful.");
   Serial.println("Attempting to connect to server...");

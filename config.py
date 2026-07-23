@@ -1,5 +1,5 @@
 MODEL_PATH = "yolo11n.pt"
-TARGET_CLASS_NAME = "person" # class to track and aim at
+TARGET_CLASS_NAME = "bottle"  # class to track and aim at
 CAMERA_SOURCE = 0
 
 FRAME_WIDTH = 640
