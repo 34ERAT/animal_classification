@@ -73,7 +73,7 @@ def compute_command(box_center_x, box_center_y):
         direction = "LEFT"
         angle = 0
 
-    return [direction, angle, locked_on]
+    return [direction, angle, True]
 
 
 async def broadcast_command(command):

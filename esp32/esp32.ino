@@ -20,8 +20,8 @@ using namespace websockets;
 
 // ---------- WiFi / Server config ----------
 const char *ssid = "Ithink";
-const char *pass = "Ilove2capples";
-const char *wsServer = "ws://your-server-address/ws";  // use ws:// not http://
+const char *pass = "ilove2capples";
+const char *wsServer = "ws://192.168.0.103:8765/ws";  // use ws:// not http://
 
 WebsocketsClient client;
 Servo panServo;
@@ -67,17 +67,27 @@ void setTilt(int angle) {
 
 // Non-blocking shoot: turn on now, loop() turns it off after SHOOT_DURATION_MS
 void startShoot() {
-  digitalWrite(TRIGGER_PIN, HIGH);
+  trigger.write(45);
   isShooting = true;
   shootStartTime = millis();
-  Serial.println("Shoot triggered");
+  Serial.println("trigger pullled");
+  delay(500);
 }
 
 void updateShoot() {
   if (isShooting && (millis() - shootStartTime >= SHOOT_DURATION_MS)) {
-    digitalWrite(TRIGGER_PIN, LOW);
+    trigger.write(0);
     isShooting = false;
-    Serial.println("Shoot released");
+    Serial.println("staring reload");
+
+    // reload
+    digitalWrite(RELOAD1_PIN, HIGH);
+    delay(1000);
+    digitalWrite(RELOAD1_PIN, LOW);
+    digitalWrite(RELOAD1_PIN, HIGH);
+    delay(1000);
+    digitalWrite(RELOAD1_PIN, LOW);
+    delay(2000);
   }
 }
 
@@ -102,17 +112,17 @@ void handleCommand(const String &msg) {
   int angle = doc[1].as<int>();
   bool shootFlag = doc[2].as<bool>();
 
-  if (direction == "LEFT") {
-    setPan(panAngle - angle);
-  } else if (direction == "RIGHT") {
-    setPan(panAngle + angle);
-  } else if (direction == "UP") {
-    setTilt(tiltAngle + angle);
-  } else if (direction == "DOWN") {
-    setTilt(tiltAngle - angle);
-  } else {
-    Serial.println("Unrecognized direction: " + direction);
-  }
+  // if (direction == "LEFT") {
+  //   setPan(panAngle - angle);
+  // } else if (direction == "RIGHT") {
+  //   setPan(panAngle + angle);
+  // } else if (direction == "UP") {
+  //   setTilt(tiltAngle + angle);
+  // } else if (direction == "DOWN") {
+  //   setTilt(tiltAngle - angle);
+  // } else {
+  //   Serial.println("Unrecognized direction: " + direction);
+  // }
   if (shootFlag) {
     startShoot();
   }
@@ -212,21 +222,6 @@ void setup() {
 }
 
 void loop() {
-  // // PULL Trigger
-  // trigger.write(70);
-  // delay(500);
-  // trigger.write(0);
-  // delay(300);
-  //
-  // // reload
-  // digitalWrite(RELOAD1_PIN, HIGH);
-  // delay(1000);
-  // digitalWrite(RELOAD1_PIN, LOW);
-  // digitalWrite(RELOAD1_PIN, HIGH);
-  // delay(1000);
-  // digitalWrite(RELOAD1_PIN, LOW);
-  // delay(1500);
-
   client.poll();
   updateShoot();
 }
