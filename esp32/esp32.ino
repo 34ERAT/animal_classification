@@ -7,14 +7,16 @@
 #define PAN_PIN 12
 #define TILT_PIN 16
 #define TRIGGER_PIN 13
-#define RELOAD1_PIN 26
-#define RELOAD2_PIN 27
+#define RELOAD1_PIN 27
+#define RELOAD2_PIN 26
 
 // Define Constans
 #define PAN_MIN 0
 #define PAN_MAX 180
 #define TILT_MIN 30
 #define TILT_MAX 150
+#define TRIGGER_START_POINT 50
+#define TRIGGER_SHOOT 0
 
 using namespace websockets;
 
@@ -32,7 +34,11 @@ int panAngle = 90;   // center position
 int tiltAngle = 90;  // center position
 
 
-enum GunState { IDLE, SHOOTING, RELOAD_DELAY_1, RELOAD_DELAY_2, RELOAD_DELAY_3 };
+enum GunState { IDLE,
+                SHOOTING,
+                RELOAD_DELAY_1,
+                RELOAD_DELAY_2,
+                RELOAD_DELAY_3 };
 GunState gunState = IDLE;
 unsigned long stateStartTime = 0;
 const int SHOOT_DURATION_MS = 500;  // how long the trigger stays on per "true"
@@ -69,9 +75,9 @@ void setTilt(int angle) {
 // Non-blocking shoot: turn on now, updateGun() turns it off
 void shoot() {
   if (gunState != IDLE) {
-    return; // Ignore if already shooting or reloading
+    return;  // Ignore if already shooting or reloading
   }
-  trigger.write(45);
+  trigger.write(TRIGGER_SHOOT);
   gunState = SHOOTING;
   stateStartTime = millis();
   Serial.println("trigger pullled");
@@ -80,7 +86,7 @@ void shoot() {
 void updateGun() {
   unsigned long now = millis();
   if (gunState == SHOOTING && (now - stateStartTime >= SHOOT_DURATION_MS)) {
-    trigger.write(0);
+    trigger.write(TRIGGER_START_POINT);
     Serial.println("staring reload");
     digitalWrite(RELOAD1_PIN, HIGH);
     gunState = RELOAD_DELAY_1;
@@ -205,17 +211,18 @@ void setup() {
   pinMode(RELOAD1_PIN, OUTPUT);
   pinMode(RELOAD2_PIN, OUTPUT);
 
-  // Dummy paning
-  ESP32PWM::allocateTimer(0);
-  ESP32PWM::allocateTimer(1);
-  ESP32PWM::allocateTimer(2);
-  ESP32PWM::allocateTimer(3);
-
-  panServo.setPeriodHertz(50);
-  panServo.attach(PAN_PIN, 500, 2400);
   trigger.attach(TRIGGER_PIN);
-
-  dummyPanning();
+  trigger.write(TRIGGER_START_POINT);
+  // // Dummy paning
+  // ESP32PWM::allocateTimer(0);
+  // ESP32PWM::allocateTimer(1);
+  // ESP32PWM::allocateTimer(2);
+  // ESP32PWM::allocateTimer(3);
+  //
+  // panServo.setPeriodHertz(50);
+  // panServo.attach(PAN_PIN, 500, 2400);
+  //
+  // dummyPanning();
 
   // WiFi + Websocket setup
   connectToWifi();
