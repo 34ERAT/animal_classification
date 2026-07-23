@@ -66,7 +66,7 @@ void setTilt(int angle) {
 }
 
 // Non-blocking shoot: turn on now, loop() turns it off after SHOOT_DURATION_MS
-void startShoot() {
+void shoot() {
   trigger.write(45);
   isShooting = true;
   shootStartTime = millis();
@@ -74,7 +74,7 @@ void startShoot() {
   delay(500);
 }
 
-void updateShoot() {
+void reloadGun() {
   if (isShooting && (millis() - shootStartTime >= SHOOT_DURATION_MS)) {
     trigger.write(0);
     isShooting = false;
@@ -124,7 +124,7 @@ void handleCommand(const String &msg) {
   //   Serial.println("Unrecognized direction: " + direction);
   // }
   if (shootFlag) {
-    startShoot();
+    shoot();
   }
 }
 
@@ -223,5 +223,5 @@ void setup() {
 
 void loop() {
   client.poll();
-  updateShoot();
+  reloadGun();
 }
