@@ -25,6 +25,7 @@ class ESP32Server:
     async def handle_client(self, websocket):
         print(f"ESP32 connected: {websocket.remote_address}")
         self.connected_clients.add(websocket)
+        
         try:
             async for message in websocket:
                 print(f"Received from ESP32: {message}")

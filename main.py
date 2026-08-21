@@ -39,9 +39,7 @@ async def vision_loop(server):
                 x1, y1, x2, y2 = target_box.xyxy[0].tolist()
                 cx, cy = float((x1 + x2) / 2), float((y1 + y2) / 2)
                 
-                # Compute discrete command for ESP32
-                command = controller.compute_discrete_command(cx, cy)
-                await server.broadcast_command(command)
+                await server.broadcast_command( [cx,cy])
                 
                 # Compute PID speeds for local HUD
                 pan_speed, tilt_speed = controller.compute_pid_speeds(cx, cy)
