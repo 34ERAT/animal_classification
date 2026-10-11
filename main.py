@@ -2,8 +2,10 @@ import asyncio
 import cv2
 import config
 from vision import YOLOTracker
-from controller import TurretController
+
+# from controller import TurretController
 from server import ESP32Server
+
 
 async def vision_loop(server):
     try:
@@ -12,12 +14,13 @@ async def vision_loop(server):
         print(e)
         return
 
-    controller = TurretController()
-    
+    # controller = TurretController()
+
     cap = cv2.VideoCapture(config.CAMERA_SOURCE)
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, config.FRAME_WIDTH)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, config.FRAME_HEIGHT)
 
+    retCount = 0
     if not cap.isOpened():
         print("Error: Could not open camera.")
         return
@@ -28,40 +31,33 @@ async def vision_loop(server):
             if not ret:
                 print("Frame grab failed, retrying...")
                 await asyncio.sleep(0.1)
-                continue
+                if retCount < 10:
+                    continue
+                else:
+                    raise ValueError("Someting  went wrong cann't grab frames")
 
-            target_box = tracker.track(frame)
-            
-            pan_speed = 0
-            tilt_speed = 0
+            annotated_frame = tracker.track(frame)
+            cv2.imshow("AI Tracking", annotated_frame)
 
-            if target_box is not None:
-                x1, y1, x2, y2 = target_box.xyxy[0].tolist()
-                cx, cy = float((x1 + x2) / 2), float((y1 + y2) / 2)
-                
-                await server.broadcast_command( [cx,cy])
-                
-                # Compute PID speeds for local HUD
-                pan_speed, tilt_speed = controller.compute_pid_speeds(cx, cy)
-
-            # Draw HUD
-            annotated_frame = tracker.draw_hud(frame, pan_speed, tilt_speed, target_box)
-            cv2.imshow(f"AI Tracking: {config.TARGET_CLASS_NAME}", annotated_frame)
-            
             if cv2.waitKey(1) & 0xFF == ord("q"):
                 break
 
-            await asyncio.sleep(0.03)
     finally:
         cap.release()
         cv2.destroyAllWindows()
 
+
 async def main():
     server = ESP32Server(config.HOST, config.PORT)
     await server.start()
-    
-    # Run the vision loop alongside the websocket server
-    await asyncio.gather(server.wait_closed(), vision_loop(server))
+    try:
+        await vision_loop(server)
+    finally:
+        print("Application Shutting down")
+        await server.close()
+    # # Run the vision loop alkAongside the websocket server
+    # await asyncio.gather(server.wait_closed(), vision_loop(server))
+
 
 if __name__ == "__main__":
     asyncio.run(main())

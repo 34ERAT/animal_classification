@@ -1,6 +1,6 @@
 MODEL_PATH = "yolo11n.pt"
 TARGET_CLASS_NAME = "bottle"  # class to track and aim at
-CAMERA_SOURCE = 0
+CAMERA_SOURCE = "/home/arc_huble/Cows in a field! English Countryside [-pxhq-aoq30].mp4"
 
 FRAME_WIDTH = 640
 FRAME_HEIGHT = 480

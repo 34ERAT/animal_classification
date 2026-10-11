@@ -1,123 +1,139 @@
+from collections import defaultdict
 import cv2
-import numpy as np
 from ultralytics import YOLO
 import config
+from ultralytics.utils.plotting import colors
+import numpy as np
 
 
 class YOLOTracker:
     def __init__(self):
         self.model = YOLO(config.MODEL_PATH)
-        self.target_class_id = None
-        for class_id, class_name in self.model.names.items():
-            if class_name == config.TARGET_CLASS_NAME:
-                self.target_class_id = class_id
-                break
+        self.target_classes = [14, 17, 18, 19, 20, 39, 22, 23]
+        # self.colors = {
+        #     0: (0, 165, 255),  # Person - Orange
+        #     14: (255, 0, 0),  # Bird - Blue
+        #     15: (0, 255, 0),  # Cat - Green
+        #     16: (0, 0, 255),  # Dog - Red
+        #     17: (255, 255, 0),  # Horse - Cyan
+        #     18: (255, 0, 255),  # Sheep - Magenta
+        #     19: (0, 255, 255),  # Cow - Yellow
+        #     20: (128, 0, 255),  # Elephant
+        #     39: (0, 128, 255),  # Bootle
+        #     22: (128, 255, 0),  # Zebra
+        #     23: (255, 128, 0),  # Giraffe
+        # }
+        self.names = {
+            0: "person",
+            14: "bird",
+            15: "cat",
+            16: "dog",
+            17: "horse",
+            18: "sheep",
+            19: "cow",
+            20: "elephant",
+            39: "Bottle",
+            22: "zebra",
+            23: "giraffe",
+        }
+        self.track_history = defaultdict(lambda: [])
 
-        if self.target_class_id is None:
-            raise ValueError(
-                f"Error: '{config.TARGET_CLASS_NAME}' not found in YOLO model."
-            )
-
-        print(
-            f"System configured to track ONLY: {config.TARGET_CLASS_NAME} (ID: {self.target_class_id})"
-        )
+        # Display settings
+        self.rect_width = 2
+        self.font = 1.0
+        self.text_width = 2
+        self.padding = 12
+        self.margin = 10
+        self.circle_thickness = 3
+        self.polyline_thickness = 2
 
     def track(self, frame):
-        # By passing 'classes=[target_class_id]', YOLO ignores everything else!
-        results = self.model(frame, classes=[self.target_class_id], verbose=False)
-        target_box = None
-        max_area = 0
-
-        if results and results[0].boxes is not None:
-            for box in results[0].boxes:
-                x1, y1, x2, y2 = box.xyxy[0].tolist()
-                area = (x2 - x1) * (y2 - y1)
-                if area > max_area:
-                    max_area = area
-                    target_box = box
-
-        return target_box
-
-    def draw_hud(self, frame, pan_speed, tilt_speed, target_box):
-        if target_box is not None:
-            x1, y1, x2, y2 = map(int, target_box.xyxy[0].tolist())
-            cx, cy = int((x1 + x2) / 2), int((y1 + y2) / 2)
-            confidence = float(target_box.conf[0])
-
-            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-            cv2.circle(frame, (cx, cy), 5, (0, 0, 255), -1)
-            cv2.putText(
-                frame,
-                f"{config.TARGET_CLASS_NAME} ({confidence:.2f})",
-                (x1, y1 - 10),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.6,
-                (0, 255, 0),
-                2,
-            )
-
-        # Draw camera center crosshair
-        cv2.line(
-            frame,
-            (config.CAMERA_CENTER_X - 15, config.CAMERA_CENTER_Y),
-            (config.CAMERA_CENTER_X + 15, config.CAMERA_CENTER_Y),
-            (255, 0, 0),
-            2,
+        results = self.model.track(
+            source=frame,
+            stream=False,
+            tracker="deepocsort.yaml",
+            persist=True,
+            # show=True,
+            classes=self.target_classes,
         )
-        cv2.line(
-            frame,
-            (config.CAMERA_CENTER_X, config.CAMERA_CENTER_Y - 15),
-            (config.CAMERA_CENTER_X, config.CAMERA_CENTER_Y + 15),
-            (255, 0, 0),
-            2,
-        )
+        if results and len(results) > 0:
+            result = results[0]
+            if result.boxes is not None and result.boxes.id is not None:
+                boxes = result.boxes.xyxy.cpu()
+                ids = result.boxes.id.cpu()
+                clss = result.boxes.cls.tolist()
+                if boxes is not None or ids is not None:
+                    for box, id, cls in zip(boxes, ids.tolist(), clss):
+                        self.draw_bbox(frame, box, id, cls)
 
-        # HUD background
-        overlay = frame.copy()
-        cv2.rectangle(overlay, (10, 10), (260, 170), (0, 0, 0), -1)
-        cv2.addWeighted(overlay, 0.7, frame, 0.3, 0, frame)
-        cv2.rectangle(frame, (10, 10), (260, 170), (255, 255, 255), 2)
-
-        cv2.putText(
-            frame,
-            "TRACKING ....",
-            (20, 35),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.5,
-            (0, 255, 255),
-            2,
-        )
-
-        # PAN Data
-        cv2.putText(
-            frame,
-            f"PAN: {pan_speed:+6.2f}",
-            (20, 65),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.6,
-            (0, 255, 0),
-            2,
-        )
-        bar_y = 80
-        cv2.line(frame, (20, bar_y), (240, bar_y), (100, 100, 100), 2)
-        cv2.line(frame, (130, bar_y - 5), (130, bar_y + 5), (255, 255, 255), 2)
-        pan_offset = int(np.clip(pan_speed * 5, -100, 100))
-        cv2.line(frame, (130, bar_y), (130 + pan_offset, bar_y), (0, 255, 0), 4)
-
-        # TILT Data
-        cv2.putText(
-            frame,
-            f"TILT: {tilt_speed:+6.2f}",
-            (20, 115),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.6,
-            (0, 165, 255),
-            2,
-        )
-        bar_x = 240
-        cv2.line(frame, (bar_x, 95), (bar_x, 135), (100, 100, 100), 2)
-        cv2.line(frame, (bar_x - 5, 115), (bar_x + 5, 115), (255, 255, 255), 2)
-        tilt_offset = int(np.clip(tilt_speed * 5, -20, 20))
-        cv2.line(frame, (bar_x, 115), (bar_x, 115 + tilt_offset), (0, 165, 255), 4)
+                        x1, y1, x2, y2 = box
+                        track = self.track_history[id]
+                        # append box centroid
+                        track.append((float((x1 + x2) / 2), (float((y1 + y2) / 2))))
+                        if len(track) > 50:
+                            track.pop(0)
+                        #   # draw track lines
+                        points = np.hstack(track).astype(np.int32).reshape((-1, 1, 2))
+                        cv2.circle(
+                            frame,
+                            (int(track[-1][0]), int(track[-1][1])),
+                            self.circle_thickness,
+                            colors(cls, True),
+                            -1,
+                        )
+                        cv2.polylines(
+                            frame,
+                            [points],
+                            isClosed=False,
+                            color=colors(cls, True),
+                            thickness=self.polyline_thickness,
+                        )
 
         return frame
+
+    def draw_bbox(self, im0, box, track_id, cls):
+        """Draw bounding box with label at TOP-LEFT, but TEXT CENTERED in its box."""
+
+        x1, y1, x2, y2 = map(int, box)
+
+        color = colors(int(cls), True)
+
+        # Draw main bounding box
+        cv2.rectangle(im0, (x1, y1), (x2, y2), color, self.rect_width)
+
+        # Prepare label
+        label = f"{self.names[int(cls)]}:{int(track_id)}"
+
+        # Get text size
+        (tw, th), _ = cv2.getTextSize(
+            label, cv2.FONT_HERSHEY_SIMPLEX, self.font, self.text_width
+        )
+
+        bg_x1 = x1  # left edge of bbox
+        bg_x2 = bg_x1 + (tw + 2 * self.padding)
+
+        bg_y2 = y1  # top of bbox
+        bg_y1 = bg_y2 - (th + 2 * self.margin)
+
+        # Draw filled background rectangle (top-left)
+        cv2.rectangle(
+            im0,
+            (bg_x1, bg_y1),
+            (bg_x2, bg_y2),
+            color,
+            -1,
+        )
+
+        text_x = bg_x1 + ((bg_x2 - bg_x1) - tw) // 2
+        text_y = bg_y1 + ((bg_y2 - bg_y1) + th) // 2 - 2  # small vertical tweak
+
+        cv2.putText(
+            im0,
+            label,
+            (text_x, text_y),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            self.font,
+            (104, 31, 17) if cls == 2 else (255, 255, 255),  # white text
+            self.text_width,
+            cv2.LINE_AA,
+        )

@@ -1,7 +1,7 @@
-import asyncio
 import json
 import websockets
 from websockets.server import serve
+
 
 class ESP32Server:
     def __init__(self, host, port):
@@ -25,7 +25,7 @@ class ESP32Server:
     async def handle_client(self, websocket):
         print(f"ESP32 connected: {websocket.remote_address}")
         self.connected_clients.add(websocket)
-        
+
         try:
             async for message in websocket:
                 print(f"Received from ESP32: {message}")
@@ -39,6 +39,8 @@ class ESP32Server:
         self.server = await serve(self.handle_client, self.host, self.port)
         print(f"Websocket server running on ws://{self.host}:{self.port}/ws")
 
-    async def wait_closed(self):
+    async def close(self):
         if self.server:
+            self.server.close()
             await self.server.wait_closed()
+            self.server = None
