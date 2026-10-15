@@ -35,7 +35,6 @@ async def vision_loop(server):
                     continue
                 else:
                     raise ValueError("Someting  went wrong cann't grab frames")
-
             annotated_frame = tracker.track(frame)
             cv2.imshow("AI Tracking", annotated_frame)
 

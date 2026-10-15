@@ -9,7 +9,7 @@ import numpy as np
 class YOLOTracker:
     def __init__(self):
         self.model = YOLO(config.MODEL_PATH)
-        self.target_classes = [14, 17, 18, 19, 20, 39, 22, 23]
+        self.target_classes = [0, 14, 17, 18, 19, 20, 39, 22, 23]
         # self.colors = {
         #     0: (0, 165, 255),  # Person - Orange
         #     14: (255, 0, 0),  # Bird - Blue
@@ -102,7 +102,7 @@ class YOLOTracker:
         cv2.rectangle(im0, (x1, y1), (x2, y2), color, self.rect_width)
 
         # Prepare label
-        label = f"{self.names[int(cls)]}:{int(track_id)}"
+        label = f"{self.names[int(cls)]}: #{int(track_id)}"
 
         # Get text size
         (tw, th), _ = cv2.getTextSize(
