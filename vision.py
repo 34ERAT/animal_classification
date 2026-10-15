@@ -7,7 +7,7 @@ import numpy as np
 
 
 class YOLOTracker:
-    def __init__(self):
+    def __init__(self, gun_controller=None):
         self.model = YOLO(config.MODEL_PATH)
         self.target_classes = [0, 14, 17, 18, 19, 20, 39, 22, 23]
         # self.colors = {
@@ -47,7 +47,139 @@ class YOLOTracker:
         self.circle_thickness = 3
         self.polyline_thickness = 2
 
+        # Gun controller (serial link to Arduino)
+        self.gun_ctrl = gun_controller
+
+        # ── Farm zone geometry ─────────────────────────────────────────────
+        # The frame is split vertically into two halves.
+        # The FARM_SIDE half is the shooting zone (red overlay).
+        fw = config.FRAME_WIDTH
+        fh = config.FRAME_HEIGHT
+        mid = fw // 2
+        if config.FARM_SIDE == "left":
+            self.farm_x1, self.farm_y1 = 0, 0
+            self.farm_x2, self.farm_y2 = mid, fh
+        else:
+            self.farm_x1, self.farm_y1 = mid, 0
+            self.farm_x2, self.farm_y2 = fw, fh
+
+        # Centre of the Farm zone – used as the turret's reference point
+        self.farm_cx = (self.farm_x1 + self.farm_x2) // 2
+        self.farm_cy = (self.farm_y1 + self.farm_y2) // 2
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Helper: test whether a point is inside the Farm zone
+    # ──────────────────────────────────────────────────────────────────────────
+    def _in_farm(self, cx: float, cy: float) -> bool:
+        return (
+            self.farm_x1 <= cx <= self.farm_x2
+            and self.farm_y1 <= cy <= self.farm_y2
+        )
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Draw the red Farm overlay on the frame (called once per frame)
+    # ──────────────────────────────────────────────────────────────────────────
+    def _draw_farm_zone(self, frame: np.ndarray):
+        # Semi-transparent red fill
+        overlay = frame.copy()
+        cv2.rectangle(
+            overlay,
+            (self.farm_x1, self.farm_y1),
+            (self.farm_x2, self.farm_y2),
+            (0, 0, 200),   # BGR red
+            -1,
+        )
+        cv2.addWeighted(overlay, 0.18, frame, 0.82, 0, frame)
+
+        # Solid red border
+        cv2.rectangle(
+            frame,
+            (self.farm_x1, self.farm_y1),
+            (self.farm_x2, self.farm_y2),
+            (0, 0, 255),
+            2,
+        )
+
+        # "FARM" label – top-left corner of the zone
+        label = "FARM"
+        (lw, lh), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 1.0, 2)
+        tx = self.farm_x1 + 8
+        ty = self.farm_y1 + lh + 8
+        cv2.rectangle(
+            frame,
+            (tx - 4, ty - lh - 4),
+            (tx + lw + 4, ty + 4),
+            (0, 0, 180),
+            -1,
+        )
+        cv2.putText(
+            frame,
+            label,
+            (tx, ty),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            1.0,
+            (255, 255, 255),
+            2,
+            cv2.LINE_AA,
+        )
+
+        # Vertical divider line at the midpoint of the frame
+        mid_x = config.FRAME_WIDTH // 2
+        cv2.line(frame, (mid_x, 0), (mid_x, frame.shape[0]), (200, 200, 200), 1)
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Draw lock-on crosshair and send serial command
+    # ──────────────────────────────────────────────────────────────────────────
+    def _handle_bottle_lock(self, frame: np.ndarray, cx: float, cy: float):
+        cx_i, cy_i = int(cx), int(cy)
+
+        # ── Crosshair ──────────────────────────────────────────────────────
+        ch_color  = (0, 0, 255)   # bright red
+        ch_radius = 24
+        ch_gap    = 8
+
+        # outer circle
+        cv2.circle(frame, (cx_i, cy_i), ch_radius, ch_color, 2)
+        # cross lines (with gap around centre)
+        cv2.line(frame, (cx_i - ch_radius - 4, cy_i), (cx_i - ch_gap, cy_i), ch_color, 2)
+        cv2.line(frame, (cx_i + ch_gap, cy_i), (cx_i + ch_radius + 4, cy_i), ch_color, 2)
+        cv2.line(frame, (cx_i, cy_i - ch_radius - 4), (cx_i, cy_i - ch_gap), ch_color, 2)
+        cv2.line(frame, (cx_i, cy_i + ch_gap), (cx_i, cy_i + ch_radius + 4), ch_color, 2)
+
+        # ── "LOCKED ON" label ──────────────────────────────────────────────
+        lock_label = "LOCKED ON"
+        (lw, lh), _ = cv2.getTextSize(lock_label, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)
+        lx = cx_i - lw // 2
+        ly = cy_i - ch_radius - 10
+        cv2.rectangle(frame, (lx - 4, ly - lh - 4), (lx + lw + 4, ly + 4), (0, 0, 180), -1)
+        cv2.putText(
+            frame, lock_label, (lx, ly),
+            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2, cv2.LINE_AA,
+        )
+
+        # ── Compute servo angles from pixel offset relative to farm centre ─
+        if self.gun_ctrl is not None:
+            from serial_controller import GunSerialController as _GC
+            err_x = cx - self.farm_cx
+            err_y = cy - self.farm_cy
+            pan_angle  = _GC.pixel_error_to_pan(err_x,  config.FRAME_WIDTH)
+            tilt_angle = _GC.pixel_error_to_tilt(err_y, config.FRAME_HEIGHT)
+
+            # Determine whether we are locked on (centred enough to shoot)
+            locked = (
+                abs(err_x) <= config.CENTER_TOLERANCE_X
+                and abs(err_y) <= config.CENTER_TOLERANCE_Y
+            )
+
+            self.gun_ctrl.send_command(tilt_angle, pan_angle, shoot=locked)
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Main tracking entry-point (called per frame from main.py)
+    # ──────────────────────────────────────────────────────────────────────────
     def track(self, frame):
+        # Draw the Farm zone first (behind detections)
+        self._draw_farm_zone(frame)
+
         results = self.model.track(
             source=frame,
             stream=False,
@@ -56,23 +188,28 @@ class YOLOTracker:
             # show=True,
             classes=self.target_classes,
         )
+
         if results and len(results) > 0:
             result = results[0]
             if result.boxes is not None and result.boxes.id is not None:
                 boxes = result.boxes.xyxy.cpu()
-                ids = result.boxes.id.cpu()
-                clss = result.boxes.cls.tolist()
+                ids   = result.boxes.id.cpu()
+                clss  = result.boxes.cls.tolist()
+
                 if boxes is not None or ids is not None:
                     for box, id, cls in zip(boxes, ids.tolist(), clss):
                         self.draw_bbox(frame, box, id, cls)
 
                         x1, y1, x2, y2 = box
+                        cx = float((x1 + x2) / 2)
+                        cy = float((y1 + y2) / 2)
+
+                        # Track history (centroid trail)
                         track = self.track_history[id]
-                        # append box centroid
-                        track.append((float((x1 + x2) / 2), (float((y1 + y2) / 2))))
+                        track.append((cx, cy))
                         if len(track) > 50:
                             track.pop(0)
-                        #   # draw track lines
+
                         points = np.hstack(track).astype(np.int32).reshape((-1, 1, 2))
                         cv2.circle(
                             frame,
@@ -89,8 +226,17 @@ class YOLOTracker:
                             thickness=self.polyline_thickness,
                         )
 
+                        # ── Any animal / bottle in Farm zone → lock-on + serial command ─
+                        # All tracked classes trigger lock-on except those in
+                        # FARM_SHOOT_EXCLUDE (currently: person = class 0).
+                        if int(cls) not in config.FARM_SHOOT_EXCLUDE and self._in_farm(cx, cy):
+                            self._handle_bottle_lock(frame, cx, cy)
+
         return frame
 
+    # ──────────────────────────────────────────────────────────────────────────
+    # Bounding-box renderer (unchanged from original)
+    # ──────────────────────────────────────────────────────────────────────────
     def draw_bbox(self, im0, box, track_id, cls):
         """Draw bounding box with label at TOP-LEFT, but TEXT CENTERED in its box."""
 

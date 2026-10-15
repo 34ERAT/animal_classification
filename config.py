@@ -1,5 +1,4 @@
 MODEL_PATH = "yolo11n.pt"
-TARGET_CLASS_NAME = "bottle"  # class to track and aim at
 CAMERA_SOURCE = 0
 
 FRAME_WIDTH = 640
@@ -21,3 +20,25 @@ MAX_ANGLE_STEP = 10
 # WebSocket Config
 HOST = "0.0.0.0"
 PORT = 8765
+
+# ── Farm / Shooting Zone ──────────────────────────────────────────────────────
+# The frame is split vertically in half.
+# FARM_SIDE = "left"  → left half is the Farm (shooting zone, drawn red)
+# FARM_SIDE = "right" → right half is the Farm (shooting zone, drawn red)
+FARM_SIDE = "left"
+
+# ── Serial port to Arduino gun-controller ────────────────────────────────────
+# Set to None to disable serial (useful for testing without hardware).
+SERIAL_PORT = "/dev/ttyACM0"  # Check your Arduino's device path
+SERIAL_BAUD = 115200
+
+# Servo neutral angles (degrees) – the guncontroller .ino maps these to PWM
+SERVO_PAN_NEUTRAL = 90  # 0°-180°  (0=left, 180=right)
+SERVO_TILT_NEUTRAL = 90  # 0°-180°  (0°=up, 180°=down as wired)
+
+# Bottle class ID in COCO / YOLO
+BOTTLE_CLASS_ID = 39
+
+# Classes that must NEVER be locked on / shot at, even inside the Farm zone.
+# 0 = person.  Add more class IDs here to protect additional categories.
+FARM_SHOOT_EXCLUDE = {0}

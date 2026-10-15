@@ -2,14 +2,15 @@ import asyncio
 import cv2
 import config
 from vision import YOLOTracker
+from serial_controller import GunSerialController
 
 # from controller import TurretController
 from server import ESP32Server
 
 
-async def vision_loop(server):
+async def vision_loop(server, gun_ctrl):
     try:
-        tracker = YOLOTracker()
+        tracker = YOLOTracker(gun_controller=gun_ctrl)
     except Exception as e:
         print(e)
         return
@@ -49,12 +50,17 @@ async def vision_loop(server):
 async def main():
     server = ESP32Server(config.HOST, config.PORT)
     await server.start()
+
+    # Initialise serial link to the Arduino gun-controller
+    gun_ctrl = GunSerialController()
+
     try:
-        await vision_loop(server)
+        await vision_loop(server, gun_ctrl)
     finally:
         print("Application Shutting down")
+        gun_ctrl.close()
         await server.close()
-    # # Run the vision loop alkAongside the websocket server
+    # # Run the vision loop alongside the websocket server
     # await asyncio.gather(server.wait_closed(), vision_loop(server))
 
 
