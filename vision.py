@@ -1,4 +1,5 @@
 from collections import defaultdict
+import os
 import cv2
 from ultralytics import YOLO
 import config
@@ -6,9 +7,113 @@ from ultralytics.utils.plotting import colors
 import numpy as np
 
 
+def _load_model() -> YOLO:
+    """
+    Load the best available model:
+      1. OpenVINO IR directory  (OPENVINO_MODEL_PATH) — fastest on Intel hardware
+      2. PyTorch weights        (MODEL_PATH)           — universal fallback
+
+    Always loads via Ultralytics using device="cpu" at this stage because
+    Ultralytics' select_device() only accepts CUDA device strings.
+    The actual OpenVINO device (GPU / AUTO) is applied afterwards by
+    _setup_ov_device(), which patches the compiled model in-place.
+    """
+    ov_path = config.OPENVINO_MODEL_PATH
+    if ov_path and os.path.isdir(ov_path):
+        print(f"[Vision] Loading OpenVINO model from '{ov_path}'")
+        return YOLO(ov_path, task="detect")
+    print(f"[Vision] OpenVINO model not found at '{ov_path}', falling back to '{config.MODEL_PATH}'.")
+    print("[Vision]   Run  python export_openvino.py  to generate the OpenVINO model.")
+    return YOLO(config.MODEL_PATH)
+
+
+def _setup_ov_device(yolo_model: YOLO, device: str) -> bool:
+    """
+    Recompile the Ultralytics-loaded OpenVINO model on the requested device.
+
+    Problem
+    -------
+    Ultralytics' predictor.setup_model() calls PyTorch's select_device() which
+    rejects any string that isn't a CUDA index or "cpu".  So we always pass
+    device="cpu" to model.track(), then swap the compiled model underneath.
+
+    How it works
+    ------------
+    1. Run one warmup prediction (dummy frame, CPU) — this forces Ultralytics to
+       fully initialise self.predictor and self.predictor.model (AutoBackend).
+    2. Read the .xml model from disk with openvino.Core.
+    3. Compile it on the real target device (e.g. "GPU").
+    4. Patch two attributes that AutoBackend.forward() uses for OpenVINO:
+         predictor.model.ov_compiled_model  — the compiled model object
+         predictor.model.infer_request      — the active inference request
+       Every subsequent model.track() call will now execute on the GPU.
+
+    Returns True on success, False if the device is unavailable or patching
+    fails (the model continues to run on CPU transparently).
+    """
+    try:
+        import openvino as ov
+        from pathlib import Path
+
+        core = ov.Core()
+        available = core.available_devices
+        print(f"[OV] Available devices: {available}")
+
+        # Validate / resolve device
+        target = device.upper()
+        if target != "AUTO" and target not in available:
+            print(f"[OV] Device '{target}' not available — staying on CPU.")
+            print(f"[OV] Tip: install Intel GPU drivers or set OPENVINO_DEVICE='CPU'.")
+            return False
+
+        # ── Warmup: initialise predictor.model (AutoBackend) on CPU ──────────
+        dummy = np.zeros(
+            (config.FRAME_HEIGHT, config.FRAME_WIDTH, 3), dtype=np.uint8
+        )
+        yolo_model.predict(dummy, device="cpu", verbose=False)
+
+        # ── Locate the OpenVINO .xml file ────────────────────────────────────
+        xml_files = list(Path(config.OPENVINO_MODEL_PATH).glob("*.xml"))
+        if not xml_files:
+            print("[OV] No .xml file found in OpenVINO model directory.")
+            return False
+
+        # ── Compile on target device ─────────────────────────────────────────
+        print(f"[OV] Compiling model on '{target}' (this may take a few seconds)…")
+        ov_model  = core.read_model(str(xml_files[0]))
+        compiled  = core.compile_model(ov_model, target)
+        infer_req = compiled.create_infer_request()
+
+        # ── Patch AutoBackend in-place ────────────────────────────────────────
+        # predictor.model is the AutoBackend instance; its forward() uses:
+        #   self.ov_compiled_model  → compiled inference graph
+        #   self.infer_request      → stateful request object
+        backend = yolo_model.predictor.model
+        backend.ov_compiled_model = compiled
+        backend.infer_request     = infer_req
+
+        print(f"[OV] ✓ Model compiled and running on: {target}")
+        return True
+
+    except Exception as exc:
+        print(f"[OV] GPU setup failed ({exc}) — model will run on CPU.")
+        return False
+
+
 class YOLOTracker:
     def __init__(self, gun_controller=None):
-        self.model = YOLO(config.MODEL_PATH)
+        # ── Load model (always via CPU at Ultralytics level) ─────────────────
+        self._ov_active = (
+            config.OPENVINO_MODEL_PATH is not None
+            and os.path.isdir(config.OPENVINO_MODEL_PATH)
+        )
+        self.model = _load_model()
+
+        # ── Recompile on Intel GPU if requested ───────────────────────────────
+        # If device is CPU (or OV model not found) skip the recompile step.
+        if self._ov_active and config.OPENVINO_DEVICE.upper() not in ("CPU", ""):
+            _setup_ov_device(self.model, config.OPENVINO_DEVICE)
+
         self.target_classes = [0, 14, 17, 18, 19, 20, 39, 22, 23]
         # self.colors = {
         #     0: (0, 165, 255),  # Person - Orange
@@ -187,6 +292,11 @@ class YOLOTracker:
             persist=True,
             # show=True,
             classes=self.target_classes,
+            # OpenVINO models must receive device="cpu" here — Ultralytics passes
+            # this to PyTorch's select_device() which only understands CUDA strings.
+            # The actual OpenVINO device (CPU / GPU / AUTO) is resolved internally
+            # by the OpenVINO runtime at model-load time via _load_model().
+            device="cpu" if self._ov_active else None,
         )
 
         if results and len(results) > 0:

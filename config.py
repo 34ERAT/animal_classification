@@ -1,4 +1,19 @@
+# ── Model paths ──────────────────────────────────────────────────────────────
+# Source PyTorch weights (used by export_openvino.py to produce the IR model).
 MODEL_PATH = "yolo11n.pt"
+
+# OpenVINO IR model directory produced by export_openvino.py.
+# Set to None to fall back to the PyTorch model (no OpenVINO acceleration).
+OPENVINO_MODEL_PATH = "yolo11n_openvino_model"
+
+# OpenVINO inference device — used by the OpenVINO runtime at model-load time.
+# NOTE: this is NOT passed to model.track(); Ultralytics receives device="cpu"
+#       there (PyTorch has no concept of "AUTO"/"GPU" without CUDA).
+# "CPU"  – always available, good baseline speed
+# "GPU"  – Intel integrated / discrete GPU (requires GPU drivers)
+# "AUTO" – OpenVINO picks the fastest available device automatically
+OPENVINO_DEVICE = "GPU"
+
 CAMERA_SOURCE = 0
 
 FRAME_WIDTH = 640

@@ -1,3 +1,6 @@
 .arduino_config.lua
 __pycache__
 runs
+yolo11n_openvino_model
+yolo26n-cls.pt
+test.py
