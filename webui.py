@@ -201,6 +201,7 @@ def read_config_py() -> dict:
         "FRAME_WIDTH", "FRAME_HEIGHT",
         "CENTER_TOLERANCE_X", "CENTER_TOLERANCE_Y", "DEADBAND",
         "KP", "MAX_ANGLE_STEP",
+        "TRACK_TRAIL_LENGTH",
         "UDP_HOST", "UDP_PORT",
         "FARM_SIDE",
         "SERIAL_PORT", "SERIAL_BAUD",

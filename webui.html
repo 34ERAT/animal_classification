@@ -591,6 +591,15 @@
             </div>
             <div class="field-hint">Caps the servo command per frame to prevent jerking.</div>
           </div>
+          <div class="field">
+            <label>Trail Length (frames)</label>
+            <div class="range-wrap">
+              <input type="range" id="trail-length" min="3" max="40" value="10"
+                oninput="document.getElementById('trail-length-val').textContent=this.value"/>
+              <span class="range-val" id="trail-length-val">10</span>
+            </div>
+            <div class="field-hint">Number of past centroid points shown as a movement trail. Short = clean, long = more history.</div>
+          </div>
         </div>
 
         <hr class="divider"/>
@@ -791,6 +800,10 @@ function applyConfig(){
     document.getElementById('kp-val').textContent=parseFloat(CFG.KP).toFixed(2); }
   v('max-step', CFG.MAX_ANGLE_STEP);
   document.getElementById('max-step-val').textContent=(CFG.MAX_ANGLE_STEP||10)+'°';
+  if(CFG.TRACK_TRAIL_LENGTH != null){
+    v('trail-length', CFG.TRACK_TRAIL_LENGTH);
+    document.getElementById('trail-length-val').textContent=CFG.TRACK_TRAIL_LENGTH;
+  }
   if(CFG.FARM_SHOOT_EXCLUDE != null)
     v('exclude-classes', Array.isArray(CFG.FARM_SHOOT_EXCLUDE)
       ? CFG.FARM_SHOOT_EXCLUDE.join(', ') : String(CFG.FARM_SHOOT_EXCLUDE));
@@ -898,13 +911,14 @@ async function saveTracking(){
   const rawExclude = g('exclude-classes') || '0';
   const exclude = rawExclude.split(',').map(x=>parseInt(x.trim())).filter(n=>!isNaN(n));
   const data = {
-    FARM_SIDE:          g('farm-side'),
-    CENTER_TOLERANCE_X: gInt('tol-x'),
-    CENTER_TOLERANCE_Y: gInt('tol-y'),
-    DEADBAND:           gInt('deadband'),
-    KP:                 gFloat('kp'),
-    MAX_ANGLE_STEP:     gInt('max-step'),
-    FARM_SHOOT_EXCLUDE: exclude,
+    FARM_SIDE:           g('farm-side'),
+    CENTER_TOLERANCE_X:  gInt('tol-x'),
+    CENTER_TOLERANCE_Y:  gInt('tol-y'),
+    DEADBAND:            gInt('deadband'),
+    KP:                  gFloat('kp'),
+    MAX_ANGLE_STEP:      gInt('max-step'),
+    TRACK_TRAIL_LENGTH:  gInt('trail-length'),
+    FARM_SHOOT_EXCLUDE:  exclude,
   };
   const res = await api('POST', '/api/config', data);
   if(res.ok) toast('✅ Tracking settings saved to config.py', 'ok');

@@ -19,21 +19,41 @@ import config
 
 class GunSerialController:
     """
-    Thread-safe wrapper around the serial link to the Arduino gun-controller.
+    Thread-safe, non-blocking wrapper around the serial link to the Arduino gun-controller.
+
+    Commands are dispatched asynchronously in a dedicated worker thread so that
+    serial I/O and Arduino delays never block or lag the video inference loop.
 
     Angles are computed from pixel offsets relative to the FARM zone centre:
       - pan  maps horizontal pixel error → servo angle (0-180°, neutral = 90°)
       - tilt maps vertical   pixel error → servo angle (0-180°, neutral = 90°)
     """
 
-    # How long (seconds) to wait for an "OK" reply before giving up
-    REPLY_TIMEOUT = 0.6
+    # Timeout waiting for an "OK" reply in the background worker thread
+    REPLY_TIMEOUT = 0.25
 
     def __init__(self):
-        self._lock = threading.Lock()
+        self._cmd_lock = threading.Lock()
         self._serial: serial.Serial | None = None
         self._connected = False
+        self._running = True
 
+        # Non-blocking command queue (holds only the freshest target command)
+        self._latest_command: tuple[int, int, bool] | None = None
+        self._cmd_event = threading.Event()
+
+        # Connect to Arduino
+        self._connect_serial()
+
+        # Start background worker thread for asynchronous command dispatch
+        self._worker_thread = threading.Thread(
+            target=self._worker_loop,
+            name="GunSerialWorker",
+            daemon=True,
+        )
+        self._worker_thread.start()
+
+    def _connect_serial(self):
         if config.SERIAL_PORT is None:
             print("[GunCtrl] SERIAL_PORT is None – running in dry-run mode.")
             return
@@ -52,6 +72,71 @@ class GunSerialController:
         except serial.SerialException as exc:
             print(f"[GunCtrl] Could not open serial port: {exc}")
             self._serial = None
+            self._connected = False
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Background Worker Loop (Executes serial communication without blocking vision)
+    # ──────────────────────────────────────────────────────────────────────────
+
+    def _worker_loop(self):
+        last_send_time = 0.0
+
+        while self._running:
+            # Wait for a new command or timeout
+            if not self._cmd_event.wait(timeout=0.05):
+                continue
+
+            self._cmd_event.clear()
+
+            # Retrieve the latest command, dropping any stale intermediate commands
+            with self._cmd_lock:
+                cmd_data = self._latest_command
+                self._latest_command = None
+
+            if cmd_data is None:
+                continue
+
+            tilt_angle, pan_angle, shoot = cmd_data
+            shoot_int = 1 if shoot else 0
+            cmd = f"{tilt_angle},{pan_angle},{shoot_int}\n"
+
+            # Enforce small pacing between commands (at most ~40 Hz) to prevent serial flooding
+            now = time.monotonic()
+            elapsed = now - last_send_time
+            if elapsed < 0.025:
+                time.sleep(0.025 - elapsed)
+
+            if not self._connected or self._serial is None:
+                # Dry-run: print without blocking
+                print(f"[GunCtrl] DRY-RUN → {cmd.strip()}")
+                last_send_time = time.monotonic()
+                continue
+
+            try:
+                # Clear any leftover incoming bytes from previous replies
+                if self._serial.in_waiting > 0:
+                    self._serial.reset_input_buffer()
+
+                self._serial.write(cmd.encode("ascii"))
+                self._serial.flush()
+                last_send_time = time.monotonic()
+
+                # Read acknowledgement with timeout
+                deadline = time.monotonic() + self.REPLY_TIMEOUT
+                while time.monotonic() < deadline and self._running:
+                    if self._serial.in_waiting > 0:
+                        line = self._serial.readline().decode("ascii", errors="ignore").strip()
+                        if line == "OK":
+                            break
+                        if line.startswith("ERR"):
+                            print(f"[GunCtrl] Arduino error: {line}")
+                            break
+                    else:
+                        time.sleep(0.005)
+
+            except serial.SerialException as exc:
+                print(f"[GunCtrl] Serial communication error: {exc}")
+                self._connected = False
 
     # ──────────────────────────────────────────────────────────────────────────
     # Public API
@@ -59,7 +144,11 @@ class GunSerialController:
 
     def send_command(self, tilt_angle: int, pan_angle: int, shoot: bool) -> bool:
         """
-        Send a control command to the Arduino.
+        Send a control command to the Arduino asynchronously.
+
+        This method is completely non-blocking: it buffers the latest requested
+        servo angles and returns immediately so the detection and tracking loop
+        maintains full FPS without stuttering or lag.
 
         Parameters
         ----------
@@ -67,41 +156,16 @@ class GunSerialController:
         pan_angle  : int   0-180°  (clamped internally)
         shoot      : bool  True → pull trigger
 
-        Returns True when the Arduino acknowledged with "OK", False otherwise.
+        Returns True immediately upon queueing the command.
         """
         tilt_angle = int(max(0, min(180, tilt_angle)))
         pan_angle  = int(max(0, min(180, pan_angle)))
-        shoot_int  = 1 if shoot else 0
 
-        cmd = f"{tilt_angle},{pan_angle},{shoot_int}\n"
+        with self._cmd_lock:
+            self._latest_command = (tilt_angle, pan_angle, bool(shoot))
+            self._cmd_event.set()
 
-        if not self._connected or self._serial is None:
-            # Dry-run: just print what would have been sent
-            print(f"[GunCtrl] DRY-RUN → {cmd.strip()}")
-            return True
-
-        with self._lock:
-            try:
-                self._serial.write(cmd.encode("ascii"))
-                self._serial.flush()
-
-                # Wait for acknowledgement
-                deadline = time.time() + self.REPLY_TIMEOUT
-                while time.time() < deadline:
-                    line = self._serial.readline().decode("ascii", errors="ignore").strip()
-                    if line == "OK":
-                        return True
-                    if line.startswith("ERR"):
-                        print(f"[GunCtrl] Arduino error: {line}")
-                        return False
-
-                print("[GunCtrl] Timeout waiting for OK")
-                return False
-
-            except serial.SerialException as exc:
-                print(f"[GunCtrl] Serial write error: {exc}")
-                self._connected = False
-                return False
+        return True
 
     # ──────────────────────────────────────────────────────────────────────────
     # Angle calculation helpers
@@ -129,7 +193,16 @@ class GunSerialController:
         return int(max(0, min(180, round(angle))))
 
     def close(self):
-        """Release the serial port."""
+        """Release the worker thread and serial port."""
+        self._running = False
+        self._cmd_event.set()
+        if hasattr(self, "_worker_thread") and self._worker_thread.is_alive():
+            self._worker_thread.join(timeout=0.5)
+
         if self._serial and self._serial.is_open:
-            self._serial.close()
+            try:
+                self._serial.close()
+            except Exception:
+                pass
         self._connected = False
+

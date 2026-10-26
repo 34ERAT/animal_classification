@@ -1,15 +1,23 @@
 #include <Servo.h>
 
 #define TRIGGER_PIN 7
-#define TILT_PIN 6
-#define PAN_PIN 5
-#define CMD_DELIM ","
+#define TILT_PIN    6
+#define PAN_PIN     5
+#define CMD_DELIM   ","
 
-char commandBuffer[64];
-size_t indexPos = 0;
-bool overflowed = false;
-Servo tiltServo, panServo;
+// ─────────────────────────────────────────────────────────────────────────────
+// Non-blocking servo move: reply "OK" immediately after writing the angle so
+// the PC's vision loop is never stalled waiting for servos to physically settle.
+// The servos continue moving in the background while the PC sends the next frame.
+// ─────────────────────────────────────────────────────────────────────────────
 
+char   commandBuffer[64];
+size_t indexPos  = 0;
+bool   overflowed = false;
+Servo  tiltServo, panServo;
+
+// Fire the trigger briefly (100 ms pulse). This is the only intentional delay
+// and it only runs when shoot_status == 1 (locked-on target).
 void shoot() {
   digitalWrite(TRIGGER_PIN, HIGH);
   delay(100);
@@ -31,15 +39,19 @@ void processCommand(char *cmd) {
     return;
   }
 
+  // Map tilt into a safer mechanical range (60°–120°)
   int tilt = map(constrain(values[0], 0, 180), 0, 180, 60, 120);
   int pan  = constrain(values[1], 0, 180);
 
   tiltServo.write(tilt);
   panServo.write(pan);
-  delay(400);                 // enough for servos to settle; tune as needed
-  if (values[2] == 1) shoot();
+  // ── NO blocking delay here — servos move in background ──────────────────
+  // Reply "OK" immediately so the Python side is unblocked and can receive
+  // the next frame / command without stuttering.
+  Serial.println("OK");
 
-  Serial.println("OK");       // tell the PC we're done
+  // Trigger only on explicit lock-on (after ACK so Python isn't stalled)
+  if (values[2] == 1) shoot();
 }
 
 void setup() {

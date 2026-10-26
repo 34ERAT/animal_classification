@@ -238,44 +238,45 @@ class YOLOTracker:
     def _handle_bottle_lock(self, frame: np.ndarray, cx: float, cy: float):
         cx_i, cy_i = int(cx), int(cy)
 
+        err_x = cx - self.farm_cx
+        err_y = cy - self.farm_cy
+
+        # Determine whether we are locked on (centred enough to shoot)
+        locked = (
+            abs(err_x) <= config.CENTER_TOLERANCE_X
+            and abs(err_y) <= config.CENTER_TOLERANCE_Y
+        )
+
         # ── Crosshair ──────────────────────────────────────────────────────
-        ch_color  = (0, 0, 255)   # bright red
+        ch_color  = (0, 0, 255) if locked else (0, 215, 255)   # Red if locked, Amber/Yellow if aiming
         ch_radius = 24
         ch_gap    = 8
 
         # outer circle
-        cv2.circle(frame, (cx_i, cy_i), ch_radius, ch_color, 2)
+        cv2.circle(frame, (cx_i, cy_i), ch_radius, ch_color, 2, cv2.LINE_AA)
         # cross lines (with gap around centre)
-        cv2.line(frame, (cx_i - ch_radius - 4, cy_i), (cx_i - ch_gap, cy_i), ch_color, 2)
-        cv2.line(frame, (cx_i + ch_gap, cy_i), (cx_i + ch_radius + 4, cy_i), ch_color, 2)
-        cv2.line(frame, (cx_i, cy_i - ch_radius - 4), (cx_i, cy_i - ch_gap), ch_color, 2)
-        cv2.line(frame, (cx_i, cy_i + ch_gap), (cx_i, cy_i + ch_radius + 4), ch_color, 2)
+        cv2.line(frame, (cx_i - ch_radius - 4, cy_i), (cx_i - ch_gap, cy_i), ch_color, 2, cv2.LINE_AA)
+        cv2.line(frame, (cx_i + ch_gap, cy_i), (cx_i + ch_radius + 4, cy_i), ch_color, 2, cv2.LINE_AA)
+        cv2.line(frame, (cx_i, cy_i - ch_radius - 4), (cx_i, cy_i - ch_gap), ch_color, 2, cv2.LINE_AA)
+        cv2.line(frame, (cx_i, cy_i + ch_gap), (cx_i, cy_i + ch_radius + 4), ch_color, 2, cv2.LINE_AA)
 
-        # ── "LOCKED ON" label ──────────────────────────────────────────────
-        lock_label = "LOCKED ON"
-        (lw, lh), _ = cv2.getTextSize(lock_label, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)
+        # ── "LOCKED ON" / "AIMING" label ──────────────────────────────────
+        lock_label = "LOCKED ON" if locked else "AIMING"
+        (lw, lh), _ = cv2.getTextSize(lock_label, cv2.FONT_HERSHEY_SIMPLEX, 0.65, 2)
         lx = cx_i - lw // 2
-        ly = cy_i - ch_radius - 10
-        cv2.rectangle(frame, (lx - 4, ly - lh - 4), (lx + lw + 4, ly + 4), (0, 0, 180), -1)
+        ly = cy_i - ch_radius - 8
+        bg_col = (0, 0, 180) if locked else (0, 140, 200)
+        cv2.rectangle(frame, (lx - 4, ly - lh - 4), (lx + lw + 4, ly + 4), bg_col, -1)
         cv2.putText(
             frame, lock_label, (lx, ly),
-            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2, cv2.LINE_AA,
+            cv2.FONT_HERSHEY_SIMPLEX, 0.65, (255, 255, 255), 2, cv2.LINE_AA,
         )
 
-        # ── Compute servo angles from pixel offset relative to farm centre ─
+        # ── Compute servo angles and send non-blocking command ─────────────
         if self.gun_ctrl is not None:
             from serial_controller import GunSerialController as _GC
-            err_x = cx - self.farm_cx
-            err_y = cy - self.farm_cy
             pan_angle  = _GC.pixel_error_to_pan(err_x,  config.FRAME_WIDTH)
             tilt_angle = _GC.pixel_error_to_tilt(err_y, config.FRAME_HEIGHT)
-
-            # Determine whether we are locked on (centred enough to shoot)
-            locked = (
-                abs(err_x) <= config.CENTER_TOLERANCE_X
-                and abs(err_y) <= config.CENTER_TOLERANCE_Y
-            )
-
             self.gun_ctrl.send_command(tilt_angle, pan_angle, shoot=locked)
 
     # ──────────────────────────────────────────────────────────────────────────
@@ -307,6 +308,16 @@ class YOLOTracker:
                 clss  = result.boxes.cls.tolist()
 
                 if boxes is not None or ids is not None:
+                    trail_limit = getattr(config, "TRACK_TRAIL_LENGTH", 10)
+                    current_ids = set(ids.tolist())
+
+                    # Prune stale tracks from memory
+                    for old_id in list(self.track_history.keys()):
+                        if old_id not in current_ids:
+                            del self.track_history[old_id]
+
+                    target_candidates = []
+
                     for box, id, cls in zip(boxes, ids.tolist(), clss):
                         self.draw_bbox(frame, box, id, cls)
 
@@ -314,13 +325,23 @@ class YOLOTracker:
                         cx = float((x1 + x2) / 2)
                         cy = float((y1 + y2) / 2)
 
-                        # Track history (centroid trail)
+                        # Track history (short, clean centroid trail)
                         track = self.track_history[id]
                         track.append((cx, cy))
-                        if len(track) > 50:
+                        if len(track) > trail_limit:
                             track.pop(0)
 
-                        points = np.hstack(track).astype(np.int32).reshape((-1, 1, 2))
+                        # Draw short tapered trail
+                        if len(track) >= 2:
+                            c = colors(cls, True)
+                            for i in range(1, len(track)):
+                                # Progressive thickness for clean comet tail
+                                t = max(1, int(round(self.polyline_thickness * (i / len(track)))))
+                                pt1 = (int(track[i - 1][0]), int(track[i - 1][1]))
+                                pt2 = (int(track[i][0]), int(track[i][1]))
+                                cv2.line(frame, pt1, pt2, c, t, cv2.LINE_AA)
+
+                        # Current centroid dot
                         cv2.circle(
                             frame,
                             (int(track[-1][0]), int(track[-1][1])),
@@ -328,19 +349,18 @@ class YOLOTracker:
                             colors(cls, True),
                             -1,
                         )
-                        cv2.polylines(
-                            frame,
-                            [points],
-                            isClosed=False,
-                            color=colors(cls, True),
-                            thickness=self.polyline_thickness,
-                        )
 
-                        # ── Any animal / bottle in Farm zone → lock-on + serial command ─
-                        # All tracked classes trigger lock-on except those in
-                        # FARM_SHOOT_EXCLUDE (currently: person = class 0).
+                        # Collect candidates in Farm zone (excluding protected classes)
                         if int(cls) not in config.FARM_SHOOT_EXCLUDE and self._in_farm(cx, cy):
-                            self._handle_bottle_lock(frame, cx, cy)
+                            dist_to_center = (cx - self.farm_cx) ** 2 + (cy - self.farm_cy) ** 2
+                            target_candidates.append((dist_to_center, cx, cy))
+
+                    # Lock onto the single primary target closest to the farm center
+                    if target_candidates:
+                        target_candidates.sort(key=lambda item: item[0])
+                        _, best_cx, best_cy = target_candidates[0]
+                        self._handle_bottle_lock(frame, best_cx, best_cy)
+
 
         return frame
 

@@ -33,6 +33,10 @@ KP = 0.08
 # Max angle nudge sent per frame (degrees) — scales with how far off-center the target is
 MAX_ANGLE_STEP = 10
 
+# ── Tracking trail length ─────────────────────────────────────────────────────
+# Number of past centroid points to show as a movement trail (short and neat, not long)
+TRACK_TRAIL_LENGTH = 10
+
 # ── UDP ESP32-CAM Stream Config ───────────────────────────────────────────────
 # UDP port and host to receive JPEG video stream (matches SERVER_PORT in esp32cam/esp32cam.ino)
 UDP_HOST = "0.0.0.0"
