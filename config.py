@@ -20,7 +20,7 @@ CAMERA_SOURCE = "udp"
 FRAME_WIDTH = 640
 FRAME_HEIGHT = 480
 
-# Controller config (for both WebSocket and local PAN/TILT)
+# Controller config (local PAN/TILT via Arduino serial)
 CAMERA_CENTER_X = FRAME_WIDTH // 2
 CAMERA_CENTER_Y = FRAME_HEIGHT // 2
 
@@ -32,10 +32,6 @@ DEADBAND = 15
 KP = 0.08
 # Max angle nudge sent per frame (degrees) — scales with how far off-center the target is
 MAX_ANGLE_STEP = 10
-
-# WebSocket Config (Turret ESP32 commands)
-HOST = "0.0.0.0"
-PORT = 8765
 
 # ── UDP ESP32-CAM Stream Config ───────────────────────────────────────────────
 # UDP port and host to receive JPEG video stream (matches SERVER_PORT in esp32cam/esp32cam.ino)
@@ -50,7 +46,7 @@ FARM_SIDE = "left"
 
 # ── Serial port to Arduino gun-controller ────────────────────────────────────
 # Set to None to disable serial (useful for testing without hardware).
-SERIAL_PORT = "/dev/ttyACM0"  # Check your Arduino's device path
+SERIAL_PORT = '/dev/ttyACM0'  # Check your Arduino's device path
 SERIAL_BAUD = 115200
 
 # Servo neutral angles (degrees) – the guncontroller .ino maps these to PWM

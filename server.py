@@ -1,26 +1,22 @@
 """
-ESP32 Server for WebSocket Turret Control & UDP ESP32-CAM Video Streaming.
-
-- ESP32Server:
-    - Runs a WebSocket server to send aiming/firing commands to the ESP32 turret.
-    - Runs a UDP camera stream receiver to ingest JPEG frames from the ESP32-CAM (esp32cam.ino).
-    - Provides OpenCV-compatible frame retrieval methods (read, get_frame, get_frame_async).
+UDP ESP32-CAM Video Stream Receiver.
 
 - UDPCamReceiver:
     - Dedicated background thread receiving UDP packets from ESP32-CAM.
     - Handles packet reassembly, out-of-order chunk handling, and JPEG decoding.
+    - Provides OpenCV-compatible frame retrieval methods (read, get_frame, get_frame_async).
+
+- FrameAssembler:
+    - Reconstructs chunked JPEG frames from individual UDP packets.
 """
 
 import asyncio
-import json
 import socket
 import struct
 import threading
 import time
 import cv2
 import numpy as np
-import websockets
-from websockets.server import serve
 import config
 
 
@@ -306,113 +302,22 @@ class UDPCamReceiver:
         }
 
 
-class ESP32Server:
-    def __init__(
-        self,
-        host: str = getattr(config, "HOST", "0.0.0.0"),
-        port: int = getattr(config, "PORT", 8765),
-        udp_host: str = getattr(config, "UDP_HOST", "0.0.0.0"),
-        udp_port: int = getattr(config, "UDP_PORT", 5005),
-    ):
-        self.host = host
-        self.port = port
-        self.connected_clients = set()
-        self.server = None
-        self.cam_receiver = UDPCamReceiver(host=udp_host, port=udp_port)
-
-    async def broadcast_command(self, command):
-        if not self.connected_clients:
-            return
-        message = json.dumps(command)
-        disconnected = set()
-        for client in self.connected_clients:
-            try:
-                await client.send(message)
-            except websockets.exceptions.ConnectionClosed:
-                disconnected.add(client)
-        self.connected_clients.difference_update(disconnected)
-
-    async def handle_client(self, websocket):
-        print(f"ESP32 connected: {websocket.remote_address}")
-        self.connected_clients.add(websocket)
-
-        try:
-            async for message in websocket:
-                print(f"Received from ESP32: {message}")
-        except websockets.exceptions.ConnectionClosed:
-            pass
-        finally:
-            print(f"ESP32 disconnected: {websocket.remote_address}")
-            self.connected_clients.discard(websocket)
-
-    async def start(self):
-        # 1. Start WebSocket server for turret control
-        self.server = await serve(self.handle_client, self.host, self.port)
-        print(f"Websocket server running on ws://{self.host}:{self.port}/ws")
-
-        # 2. Start UDP receiver for ESP32-CAM video stream
-        loop = asyncio.get_running_loop()
-        self.cam_receiver.start(loop=loop)
-
-    async def close(self):
-        self.cam_receiver.stop()
-        if self.server:
-            self.server.close()
-            await self.server.wait_closed()
-            self.server = None
-
-    # ── Camera stream convenience methods ─────────────────────────────────────
-    def read(self, wait: bool = True, timeout: float = 1.0) -> tuple[bool, np.ndarray | None]:
-        """Grab the latest decoded frame from ESP32-CAM (returns (ret, frame))."""
-        return self.cam_receiver.read(wait=wait, timeout=timeout)
-
-    def get_frame(self, wait: bool = True, timeout: float = 1.0) -> tuple[bool, np.ndarray | None]:
-        """Alias for read()."""
-        return self.cam_receiver.get_frame(wait=wait, timeout=timeout)
-
-    async def get_frame_async(self, timeout: float = 1.0) -> tuple[bool, np.ndarray | None]:
-        """Asynchronously get the latest decoded frame."""
-        return await self.cam_receiver.get_frame_async(timeout=timeout)
-
-    @property
-    def latest_frame(self) -> np.ndarray | None:
-        """Returns the latest frame copy or None."""
-        return self.cam_receiver.latest_frame
-
-    @property
-    def fps(self) -> float:
-        """Current ESP32-CAM stream FPS."""
-        return self.cam_receiver.fps
-
-    @property
-    def is_camera_active(self) -> bool:
-        """Returns True if the ESP32-CAM is actively streaming frames."""
-        return self.cam_receiver.is_active
-
-    @property
-    def camera_stats(self) -> dict:
-        """Stream telemetry statistics."""
-        return self.cam_receiver.stats
-
-
 async def _standalone_runner():
-    server = ESP32Server(
-        config.HOST,
-        config.PORT,
-        udp_host=config.UDP_HOST,
-        udp_port=config.UDP_PORT,
-    )
-    await server.start()
-    print("\n[Server] Live stream preview running. Press Ctrl+C or 'q' in OpenCV window to quit.\n")
+    """Preview the ESP32-CAM UDP stream in an OpenCV window."""
+    cam = UDPCamReceiver(host=config.UDP_HOST, port=config.UDP_PORT)
+    loop = asyncio.get_running_loop()
+    cam.start(loop=loop)
+    print(f"\n[Server] Listening for ESP32-CAM on UDP port {config.UDP_PORT}.")
+    print("[Server] Press Ctrl+C or 'q' in the OpenCV window to quit.\n")
 
     has_display = True
     try:
         while True:
-            ret, frame = await server.get_frame_async(timeout=0.5)
+            ret, frame = await cam.get_frame_async(timeout=0.5)
             if ret and frame is not None:
                 if has_display:
                     try:
-                        stats_text = f"FPS: {server.fps} | ESP32-CAM"
+                        stats_text = f"FPS: {cam.fps} | ESP32-CAM"
                         cv2.putText(
                             frame,
                             stats_text,
@@ -427,13 +332,13 @@ async def _standalone_runner():
                             break
                     except cv2.error:
                         has_display = False
-                        print(f"[Server] Stream active: {server.camera_stats}")
+                        print(f"[Server] Stream active: {cam.stats}")
             else:
                 await asyncio.sleep(0.05)
     except KeyboardInterrupt:
         pass
     finally:
-        await server.close()
+        cam.stop()
         if has_display:
             try:
                 cv2.destroyAllWindows()
@@ -446,3 +351,4 @@ if __name__ == "__main__":
         asyncio.run(_standalone_runner())
     except KeyboardInterrupt:
         print("\nExiting server.")
+

@@ -1,0 +1,1114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Animal Tracking — Configuration</title>
+<style>
+  :root{
+    --bg:#0f1117; --surface:#1a1d2e; --surface2:#222540;
+    --accent:#6c63ff; --accent2:#00d4aa;
+    --danger:#ff4757; --warn:#ffa502; --ok:#2ed573;
+    --text:#e8eaf6; --muted:#7f8fa6; --border:#2d3561;
+    --radius:10px; --radius-sm:6px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;
+    min-height:100vh;display:flex;flex-direction:column}
+
+  /* ── Top bar ── */
+  header{background:var(--surface);border-bottom:1px solid var(--border);
+    padding:14px 24px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:100}
+  header .logo{font-size:1.35rem;font-weight:700;
+    background:linear-gradient(135deg,var(--accent),var(--accent2));
+    -webkit-background-clip:text;-webkit-text-fill-color:transparent}
+  header .sub{font-size:.78rem;color:var(--muted)}
+  .status-pill{margin-left:auto;display:flex;align-items:center;gap:8px;
+    font-size:.78rem;color:var(--muted)}
+  .dot{width:9px;height:9px;border-radius:50%;background:var(--ok);
+    animation:pulse 2s ease-in-out infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+
+  /* ── Layout ── */
+  .layout{display:flex;flex:1;overflow:hidden}
+  nav{width:200px;background:var(--surface);border-right:1px solid var(--border);
+    padding:18px 0;display:flex;flex-direction:column;gap:2px;flex-shrink:0}
+  nav a{display:flex;align-items:center;gap:10px;padding:10px 20px;
+    font-size:.86rem;color:var(--muted);text-decoration:none;border-radius:0 6px 6px 0;
+    margin-right:10px;transition:all .15s;cursor:pointer;user-select:none}
+  nav a:hover{color:var(--text);background:var(--surface2)}
+  nav a.active{color:var(--accent);background:rgba(108,99,255,.12);
+    border-left:3px solid var(--accent)}
+  nav a svg{width:16px;height:16px;flex-shrink:0}
+  nav .nav-section{padding:16px 20px 6px;font-size:.7rem;text-transform:uppercase;
+    letter-spacing:.08em;color:var(--muted)}
+
+  main{flex:1;overflow-y:auto;padding:28px}
+
+  /* ── Page sections ── */
+  .page{display:none}
+  .page.active{display:block;animation:fadeIn .2s ease}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+  /* ── Cards ── */
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+    padding:22px;margin-bottom:20px}
+  .card-title{font-size:.95rem;font-weight:600;margin-bottom:16px;
+    display:flex;align-items:center;gap:8px;color:var(--text)}
+  .card-title svg{width:18px;height:18px;color:var(--accent)}
+  .card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
+  .card-grid.two{grid-template-columns:1fr 1fr}
+
+  /* ── Form fields ── */
+  .field{display:flex;flex-direction:column;gap:6px}
+  label{font-size:.78rem;font-weight:500;color:var(--muted)}
+  label span.req{color:var(--accent);margin-left:2px}
+  input,select,textarea{
+    background:var(--surface2);border:1px solid var(--border);color:var(--text);
+    border-radius:var(--radius-sm);padding:9px 12px;font-size:.88rem;width:100%;
+    transition:border-color .15s,box-shadow .15s;outline:none;font-family:inherit}
+  input:focus,select:focus{border-color:var(--accent);
+    box-shadow:0 0 0 3px rgba(108,99,255,.15)}
+  input[type=range]{padding:4px 0;accent-color:var(--accent)}
+  select option{background:var(--surface)}
+  .field-hint{font-size:.73rem;color:var(--muted);margin-top:2px}
+
+  /* ── Toggle ── */
+  .toggle-row{display:flex;align-items:center;justify-content:space-between;
+    padding:6px 0}
+  .toggle{position:relative;display:inline-block;width:42px;height:24px}
+  .toggle input{opacity:0;width:0;height:0}
+  .slider{position:absolute;cursor:pointer;inset:0;background:#444;
+    border-radius:24px;transition:.3s}
+  .slider:before{content:'';position:absolute;width:18px;height:18px;left:3px;top:3px;
+    background:#fff;border-radius:50%;transition:.3s}
+  input:checked+.slider{background:var(--accent)}
+  input:checked+.slider:before{transform:translateX(18px)}
+
+  /* ── Range display ── */
+  .range-wrap{display:flex;align-items:center;gap:10px}
+  .range-wrap input[type=range]{flex:1}
+  .range-val{font-size:.82rem;color:var(--accent);min-width:36px;text-align:right;
+    font-weight:600}
+
+  /* ── Buttons ── */
+  .btn{display:inline-flex;align-items:center;gap:7px;padding:9px 18px;
+    border:none;border-radius:var(--radius-sm);font-size:.86rem;font-weight:600;
+    cursor:pointer;transition:all .15s;text-decoration:none}
+  .btn-primary{background:var(--accent);color:#fff}
+  .btn-primary:hover{background:#5a52e0;transform:translateY(-1px)}
+  .btn-secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border)}
+  .btn-secondary:hover{background:var(--border)}
+  .btn-danger{background:var(--danger);color:#fff}
+  .btn-danger:hover{opacity:.85}
+  .btn-ok{background:var(--ok);color:#000}
+  .btn-ok:hover{opacity:.85}
+  .btn:active{transform:scale(.97)}
+  .btn-row{display:flex;gap:10px;margin-top:18px;flex-wrap:wrap}
+
+  /* ── Toast ── */
+  #toast-host{position:fixed;bottom:28px;right:28px;display:flex;
+    flex-direction:column;gap:8px;z-index:9999}
+  .toast{background:var(--surface);border:1px solid var(--border);color:var(--text);
+    border-radius:var(--radius);padding:12px 18px;font-size:.84rem;min-width:220px;
+    animation:slideIn .25s ease;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+  .toast.ok{border-left:4px solid var(--ok)}
+  .toast.err{border-left:4px solid var(--danger)}
+  .toast.info{border-left:4px solid var(--accent)}
+  @keyframes slideIn{from{opacity:0;transform:translateX(40px)}to{opacity:1;transform:none}}
+
+  /* ── IP badge ── */
+  .ip-badge{display:inline-flex;align-items:center;gap:6px;
+    background:rgba(0,212,170,.1);border:1px solid rgba(0,212,170,.25);
+    border-radius:var(--radius-sm);padding:5px 12px;font-size:.82rem;
+    color:var(--accent2);font-family:monospace;margin-top:6px}
+
+  /* ── Info box ── */
+  .info-box{background:rgba(108,99,255,.08);border:1px solid rgba(108,99,255,.2);
+    border-radius:var(--radius-sm);padding:12px 16px;font-size:.82rem;
+    color:var(--muted);line-height:1.6;margin-bottom:14px}
+  .info-box strong{color:var(--accent)}
+  .warn-box{background:rgba(255,165,2,.07);border:1px solid rgba(255,165,2,.25);
+    border-radius:var(--radius-sm);padding:12px 16px;font-size:.82rem;
+    color:var(--warn);line-height:1.6;margin-bottom:14px}
+
+  /* ── Stat grid ── */
+  .stat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
+  .stat{background:var(--surface2);border:1px solid var(--border);
+    border-radius:var(--radius-sm);padding:14px;text-align:center}
+  .stat .val{font-size:1.5rem;font-weight:700;color:var(--accent)}
+  .stat .key{font-size:.72rem;color:var(--muted);margin-top:3px}
+
+  /* ── Code block ── */
+  pre{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);
+    padding:14px;font-size:.78rem;overflow-x:auto;line-height:1.65;color:var(--muted)}
+  code{font-family:'Fira Code','Cascadia Code',monospace}
+
+  /* ── Port pill row ── */
+  .port-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+  .port-pill{background:var(--surface2);border:1px solid var(--border);
+    border-radius:20px;padding:4px 12px;font-size:.78rem;font-family:monospace;
+    cursor:pointer;transition:all .15s;user-select:none;color:var(--text)}
+  .port-pill:hover{border-color:var(--accent);color:var(--accent);
+    background:rgba(108,99,255,.1)}
+
+
+  /* ── Divider ── */
+  .divider{border:none;border-top:1px solid var(--border);margin:20px 0}
+
+  /* ── Process status banner ── */
+  .proc-banner{display:flex;align-items:center;gap:16px;padding:16px 20px;
+    border-radius:var(--radius);margin-bottom:20px;border:1px solid var(--border)}
+  .proc-banner.running{background:rgba(46,213,115,.07);border-color:rgba(46,213,115,.3)}
+  .proc-banner.stopped{background:rgba(127,143,166,.07);border-color:var(--border)}
+  .proc-banner.error{background:rgba(255,71,87,.07);border-color:rgba(255,71,87,.3)}
+  .proc-status-dot{width:14px;height:14px;border-radius:50%;flex-shrink:0}
+  .proc-status-dot.running{background:var(--ok);animation:pulse 1.4s ease-in-out infinite}
+  .proc-status-dot.stopped{background:var(--muted)}
+  .proc-status-dot.error{background:var(--danger)}
+  .proc-status-label{font-weight:700;font-size:1.05rem}
+  .proc-status-meta{font-size:.78rem;color:var(--muted)}
+  .proc-banner .btn-row{margin:0;margin-left:auto}
+
+  /* ── Run options ── */
+  .run-options{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;
+    margin-bottom:18px}
+
+  /* ── Live terminal ── */
+  .terminal{background:#0a0c13;border:1px solid var(--border);border-radius:var(--radius);
+    height:400px;overflow-y:auto;padding:12px 16px;font-family:'Fira Code','Cascadia Code',
+    'Consolas',monospace;font-size:.78rem;line-height:1.7;scroll-behavior:smooth}
+  .terminal::-webkit-scrollbar{width:6px}
+  .terminal::-webkit-scrollbar-thumb{background:#333;border-radius:3px}
+  .log-line{display:flex;gap:10px;padding:1px 0}
+  .log-ts{color:#444;flex-shrink:0;user-select:none}
+  .log-msg{color:#c5c8d6;word-break:break-all;white-space:pre-wrap}
+  .log-msg.system{color:var(--accent2);font-style:italic}
+  .log-msg.err{color:#ff6b81}
+  .log-msg.warn{color:var(--warn)}
+  .log-msg.ok{color:var(--ok)}
+  .terminal-toolbar{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+  .terminal-toolbar .label{font-size:.78rem;color:var(--muted);font-weight:500;flex:1}
+  .autoscroll-wrap{display:flex;align-items:center;gap:6px;font-size:.75rem;color:var(--muted);
+    cursor:pointer;user-select:none}
+
+  @media(max-width:720px){
+    nav{width:54px}
+    nav a span{display:none}
+    nav .nav-section{display:none}
+    main{padding:16px}
+    .card-grid.two{grid-template-columns:1fr}
+    .terminal{height:260px}
+  }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <div class="logo">🎯 Animal Tracker</div>
+    <div class="sub">Configuration Dashboard</div>
+  </div>
+  <div class="status-pill">
+    <div class="dot" id="srv-dot"></div>
+    <span id="srv-label">Loading...</span>
+  </div>
+</header>
+
+<div class="layout">
+  <!-- NAV -->
+  <nav>
+    <div class="nav-section">Control</div>
+    <a class="active" data-page="run" onclick="show('run')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+      <span>Run System</span>
+    </a>
+    <div class="nav-section">Hardware</div>
+    <a data-page="cam" onclick="show('cam')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 3l-4 4-4-4"/><circle cx="12" cy="14" r="3"/></svg>
+      <span>ESP32-CAM</span>
+    </a>
+    <a data-page="serial" onclick="show('serial')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
+      <span>Serial / Arduino</span>
+    </a>
+    <div class="nav-section">Model</div>
+    <a data-page="model" onclick="show('model')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+      <span>YOLO / OpenVINO</span>
+    </a>
+    <a data-page="tracking" onclick="show('tracking')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/></svg>
+      <span>Tracking Zone</span>
+    </a>
+    <div class="nav-section">Network</div>
+    <a data-page="network" onclick="show('network')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="5" r="3"/><circle cx="3" cy="19" r="3"/><circle cx="21" cy="19" r="3"/><path d="M12 8v3M9.3 17.7l-4.6-6M14.7 17.7l4.6-6"/></svg>
+      <span>Ports & Network</span>
+    </a>
+    <div class="nav-section">Info</div>
+    <a data-page="about" onclick="show('about')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      <span>About</span>
+    </a>
+  </nav>
+
+  <main>
+
+    <!-- ═══ PAGE: RUN SYSTEM ═══ -->
+    <div class="page active" id="page-run">
+
+      <!-- Status Banner -->
+      <div class="proc-banner stopped" id="proc-banner">
+        <div class="proc-status-dot stopped" id="proc-dot"></div>
+        <div>
+          <div class="proc-status-label" id="proc-label">Stopped</div>
+          <div class="proc-status-meta" id="proc-meta">main.py is not running</div>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-ok" id="btn-start" onclick="startProcess()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            Start
+          </button>
+          <button class="btn btn-danger" id="btn-stop" onclick="stopProcess()" disabled>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12"/></svg>
+            Stop
+          </button>
+          <button class="btn btn-secondary" id="btn-restart" onclick="restartProcess()" disabled>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.5"/></svg>
+            Restart
+          </button>
+        </div>
+      </div>
+
+      <!-- Launch Options -->
+      <div class="card">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
+          Launch Options
+        </div>
+        <div class="run-options">
+          <div class="field">
+            <label>Camera Source</label>
+            <select id="run-source">
+              <option value="udp">UDP — ESP32-CAM (default)</option>
+              <option value="0">0 — USB Webcam index 0</option>
+              <option value="1">1 — USB Webcam index 1</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>UDP Port (override)</label>
+            <input id="run-udp-port" type="number" min="1024" max="65535" placeholder="from config.py"/>
+            <div class="field-hint">Leave empty to use config.py value.</div>
+          </div>
+          <div class="field">
+            <label>Display Mode</label>
+            <div class="toggle-row" style="margin-top:6px">
+              <span style="font-size:.85rem">Headless (no OpenCV window)</span>
+              <label class="toggle">
+                <input type="checkbox" id="run-no-gui"/>
+                <span class="slider"></span>
+              </label>
+            </div>
+            <div class="field-hint">Enable on servers or remote SSH sessions without a display.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Live Log Terminal -->
+      <div class="card">
+        <div class="terminal-toolbar">
+          <span class="label">📟 Live Output</span>
+          <label class="autoscroll-wrap">
+            <input type="checkbox" id="autoscroll-chk" checked/>
+            Auto-scroll
+          </label>
+          <button class="btn btn-secondary" style="padding:5px 12px;font-size:.75rem" onclick="clearTerminal()">
+            Clear
+          </button>
+        </div>
+        <div class="terminal" id="terminal"></div>
+      </div>
+
+    </div><!-- /page-run -->
+
+    <!-- ═══ PAGE: ESP32-CAM ═══ -->
+    <div class="page" id="page-cam">
+      <div class="card">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><circle cx="12" cy="14" r="3"/></svg>
+          ESP32-CAM — WiFi &amp; Stream Settings
+        </div>
+        <div class="info-box">
+          These settings are written directly into <strong>esp32cam/esp32cam.ino</strong>.
+          After saving, re-flash the sketch to the ESP32-CAM board via Arduino IDE.
+        </div>
+        <div class="card-grid">
+          <div class="field">
+            <label>WiFi SSID <span class="req">*</span></label>
+            <input id="cam-ssid" type="text" placeholder="YourNetwork"/>
+            <div class="field-hint">Name of the 2.4 GHz WiFi the ESP32-CAM should connect to.</div>
+          </div>
+          <div class="field">
+            <label>WiFi Password <span class="req">*</span></label>
+            <input id="cam-pass" type="password" placeholder="••••••••"/>
+            <div class="field-hint">Leave empty for open networks.</div>
+          </div>
+          <div class="field">
+            <label>Server IP (this machine) <span class="req">*</span></label>
+            <input id="cam-ip" type="text" placeholder="192.168.x.x"/>
+            <div class="field-hint" id="cam-ip-hint">IP address your PC is reachable at on the same WiFi network.</div>
+          </div>
+          <div class="field">
+            <label>UDP Stream Port</label>
+            <input id="cam-port" type="number" min="1024" max="65535" placeholder="5005"/>
+            <div class="field-hint">Must match UDP_PORT in config.py (default 5005).</div>
+          </div>
+          <div class="field">
+            <label>Frame Size</label>
+            <select id="cam-framesize">
+              <option value="FRAMESIZE_QVGA">QVGA — 320×240 (Low CPU, Fast)</option>
+              <option value="FRAMESIZE_VGA">VGA — 640×480 (Recommended)</option>
+              <option value="FRAMESIZE_SVGA">SVGA — 800×600</option>
+              <option value="FRAMESIZE_XGA">XGA — 1024×768 (Slow)</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>JPEG Quality <span style="color:var(--muted)">(10 = best, 63 = smallest)</span></label>
+            <div class="range-wrap">
+              <input type="range" id="cam-quality" min="10" max="63" value="12"
+                oninput="document.getElementById('cam-quality-val').textContent=this.value"/>
+              <span class="range-val" id="cam-quality-val">12</span>
+            </div>
+            <div class="field-hint">Lower value = larger JPEG, better quality, more bandwidth.</div>
+          </div>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-primary" onclick="saveEsp32Cam()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+            Save to esp32cam.ino
+          </button>
+          <button class="btn btn-secondary" onclick="loadAll()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.5"/></svg>
+            Reload
+          </button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">⚠️ Troubleshooting</div>
+        <div class="warn-box">
+          If camera shows <strong>0x106 (ESP_ERR_NOT_SUPPORTED)</strong>:<br>
+          1. Reseat the OV2640 ribbon cable (gold contacts face down).<br>
+          2. Power via 5 V / ≥ 1 A — <em>not</em> from the FTDI 3.3 V pin.<br>
+          3. Enable PSRAM in Arduino IDE → Tools → PSRAM → "Enabled".<br>
+          4. Board must be set to <strong>AI Thinker ESP32-CAM</strong>.
+        </div>
+        <div class="card-title" style="font-size:.85rem;margin-top:8px">Flash Command (esptool)</div>
+        <pre><code id="flash-cmd">python -m esptool --chip esp32 --port /dev/ttyACM0 --baud 460800 write_flash -z 0x1000 firmware.bin</code></pre>
+      </div>
+    </div>
+
+    <!-- ═══ PAGE: SERIAL ═══ -->
+    <div class="page" id="page-serial">
+      <div class="card">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
+          Arduino Gun-Controller — Serial Port
+        </div>
+        <div class="info-box">
+          The Arduino gun-controller receives pan/tilt/fire commands over USB serial.
+          Pick the correct port from detected devices below.
+        </div>
+        <div class="field" style="margin-bottom:14px">
+          <label>Detected USB / ACM Serial Ports</label>
+          <div class="port-row" id="port-pills">
+            <span style="color:var(--muted);font-size:.8rem">Loading...</span>
+          </div>
+        </div>
+        <div class="card-grid">
+          <div class="field">
+            <label>Serial Port <span class="req">*</span></label>
+            <input id="serial-port" type="text" placeholder="/dev/ttyACM0"/>
+          </div>
+          <div class="field">
+            <label>Baud Rate</label>
+            <select id="serial-baud">
+              <option value="9600">9600</option>
+              <option value="19200">19200</option>
+              <option value="38400">38400</option>
+              <option value="57600">57600</option>
+              <option value="115200" selected>115200</option>
+              <option value="230400">230400</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Pan Servo Neutral (°)</label>
+            <div class="range-wrap">
+              <input type="range" id="pan-neutral" min="0" max="180" value="90"
+                oninput="document.getElementById('pan-neutral-val').textContent=this.value+'°'"/>
+              <span class="range-val" id="pan-neutral-val">90°</span>
+            </div>
+          </div>
+          <div class="field">
+            <label>Tilt Servo Neutral (°)</label>
+            <div class="range-wrap">
+              <input type="range" id="tilt-neutral" min="0" max="180" value="90"
+                oninput="document.getElementById('tilt-neutral-val').textContent=this.value+'°'"/>
+              <span class="range-val" id="tilt-neutral-val">90°</span>
+            </div>
+          </div>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-primary" onclick="saveSerial()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+            Save Serial Settings
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ PAGE: MODEL ═══ -->
+    <div class="page" id="page-model">
+      <div class="card">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+          YOLO Model &amp; OpenVINO Settings
+        </div>
+        <div class="card-grid">
+          <div class="field">
+            <label>PyTorch Model Path</label>
+            <input id="model-path" type="text" placeholder="yolo11n.pt"/>
+            <div class="field-hint">Relative path to the .pt weights file.</div>
+          </div>
+          <div class="field">
+            <label>OpenVINO Model Directory</label>
+            <input id="ov-model-path" type="text" placeholder="yolo11n_openvino_model"/>
+            <div class="field-hint">Produced by <code>python export_openvino.py</code>. Leave blank to use PyTorch.</div>
+          </div>
+          <div class="field">
+            <label>OpenVINO Inference Device</label>
+            <select id="ov-device">
+              <option value="CPU">CPU — always available</option>
+              <option value="GPU">GPU — Intel iGPU / dGPU (fastest)</option>
+              <option value="AUTO">AUTO — OpenVINO auto-selects</option>
+            </select>
+            <div class="field-hint">Detected devices shown below.</div>
+          </div>
+          <div class="field">
+            <label>Camera Source</label>
+            <select id="camera-source">
+              <option value="udp">UDP — ESP32-CAM stream</option>
+              <option value="0">0 — USB Webcam (index 0)</option>
+              <option value="1">1 — USB Webcam (index 1)</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Frame Width (px)</label>
+            <input id="frame-w" type="number" min="160" max="1920" step="1" placeholder="640"/>
+          </div>
+          <div class="field">
+            <label>Frame Height (px)</label>
+            <input id="frame-h" type="number" min="120" max="1080" step="1" placeholder="480"/>
+          </div>
+        </div>
+
+        <hr class="divider"/>
+
+        <div class="card-title" style="font-size:.88rem">Detected OpenVINO Devices</div>
+        <div id="ov-devices-row" class="stat-grid" style="margin-bottom:16px">
+          <div class="stat"><div class="val" style="font-size:1rem">—</div><div class="key">Loading...</div></div>
+        </div>
+
+        <div class="btn-row">
+          <button class="btn btn-primary" onclick="saveModel()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+            Save Model Settings
+          </button>
+          <button class="btn btn-secondary" onclick="toast('Run: python export_openvino.py in a terminal.','info')">
+            Export OpenVINO Model
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ PAGE: TRACKING ZONE ═══ -->
+    <div class="page" id="page-tracking">
+      <div class="card">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>
+          Tracking &amp; Shooting Zone
+        </div>
+        <div class="card-grid">
+          <div class="field">
+            <label>Farm Side (Shooting Zone)</label>
+            <select id="farm-side">
+              <option value="left">Left half — shooting zone is on the LEFT</option>
+              <option value="right">Right half — shooting zone is on the RIGHT</option>
+            </select>
+            <div class="field-hint">The frame is split in half; targets in the selected side are engaged.</div>
+          </div>
+          <div class="field">
+            <label>Center Tolerance X (px)</label>
+            <div class="range-wrap">
+              <input type="range" id="tol-x" min="5" max="200" value="40"
+                oninput="document.getElementById('tol-x-val').textContent=this.value+'px'"/>
+              <span class="range-val" id="tol-x-val">40px</span>
+            </div>
+            <div class="field-hint">Horizontal dead zone — inside this = "locked on".</div>
+          </div>
+          <div class="field">
+            <label>Center Tolerance Y (px)</label>
+            <div class="range-wrap">
+              <input type="range" id="tol-y" min="5" max="200" value="40"
+                oninput="document.getElementById('tol-y-val').textContent=this.value+'px'"/>
+              <span class="range-val" id="tol-y-val">40px</span>
+            </div>
+          </div>
+          <div class="field">
+            <label>Deadband (px)</label>
+            <div class="range-wrap">
+              <input type="range" id="deadband" min="1" max="60" value="15"
+                oninput="document.getElementById('deadband-val').textContent=this.value+'px'"/>
+              <span class="range-val" id="deadband-val">15px</span>
+            </div>
+            <div class="field-hint">Minimum error before servo moves at all.</div>
+          </div>
+          <div class="field">
+            <label>Proportional Gain Kp</label>
+            <div class="range-wrap">
+              <input type="range" id="kp" min="0.01" max="0.5" step="0.01" value="0.08"
+                oninput="document.getElementById('kp-val').textContent=parseFloat(this.value).toFixed(2)"/>
+              <span class="range-val" id="kp-val">0.08</span>
+            </div>
+            <div class="field-hint">Speed multiplier: higher = faster servo response.</div>
+          </div>
+          <div class="field">
+            <label>Max Angle Step (°/frame)</label>
+            <div class="range-wrap">
+              <input type="range" id="max-step" min="1" max="30" value="10"
+                oninput="document.getElementById('max-step-val').textContent=this.value+'°'"/>
+              <span class="range-val" id="max-step-val">10°</span>
+            </div>
+            <div class="field-hint">Caps the servo command per frame to prevent jerking.</div>
+          </div>
+        </div>
+
+        <hr class="divider"/>
+
+        <div class="card-title" style="font-size:.88rem">Protected Classes (never shoot)</div>
+        <div class="info-box">
+          COCO class IDs listed here will <strong>never</strong> be targeted, even if inside the farm zone.
+          <br>Class 0 = person (always protected). Separate multiple IDs with commas.
+        </div>
+        <div class="field">
+          <label>Excluded Class IDs</label>
+          <input id="exclude-classes" type="text" placeholder="0, 1, 2"/>
+        </div>
+
+        <div class="btn-row">
+          <button class="btn btn-primary" onclick="saveTracking()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+            Save Tracking Settings
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ PAGE: NETWORK / PORTS ═══ -->
+    <div class="page" id="page-network">
+      <div class="card">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="5" r="3"/><circle cx="3" cy="19" r="3"/><circle cx="21" cy="19" r="3"/><path d="M12 8v3M9.3 17.7l-4.6-6M14.7 17.7l4.6-6"/></svg>
+          UDP Stream Network
+        </div>
+        <div class="info-box">
+          Your machine's IP address (for the ESP32-CAM's <code>SERVER_IP</code>):
+          <div class="ip-badge" id="local-ip">🔍 detecting...</div>
+        </div>
+        <div class="card-grid">
+          <div class="field">
+            <label>UDP Stream Host (bind)</label>
+            <input id="udp-host" type="text" placeholder="0.0.0.0"/>
+            <div class="field-hint">IP to listen on for the ESP32-CAM UDP JPEG stream. 0.0.0.0 = all interfaces.</div>
+          </div>
+          <div class="field">
+            <label>UDP Stream Port</label>
+            <input id="udp-port" type="number" min="1024" max="65535" placeholder="5005"/>
+            <div class="field-hint">Must match SERVER_PORT in esp32cam.ino.</div>
+          </div>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-primary" onclick="saveNetwork()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+            Save Network Settings
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ PAGE: ABOUT ═══ -->
+    <div class="page" id="page-about">
+      <div class="card">
+        <div class="card-title">🚀 Quick Start</div>
+        <pre><code># 1. Flash the ESP32-CAM (after configuring WiFi in the ESP32-CAM tab above)
+#    Open esp32cam/esp32cam.ino in Arduino IDE → Upload
+
+# 2. Launch the tracking system (one command does everything)
+python main.py
+
+# 3. Optional flags
+python main.py --source udp           # ESP32-CAM (default)
+python main.py --source 0             # USB webcam index 0
+python main.py --no-gui               # headless / SSH mode
+python main.py --udp-port 5005        # override UDP port</code></pre>
+      </div>
+      <div class="card">
+        <div class="card-title">📡 Connection Diagram</div>
+        <pre><code>
+  ┌─────────────────┐   UDP JPEG (port 5005)   ┌───────────────────────────┐
+  │  ESP32-CAM      │ ───────────────────────► │   This PC                 │
+  │  (WiFi)         │                          │   python main.py          │
+  └─────────────────┘                          │                           │
+                                               │   ┌───────────────────┐   │
+                                               │   │  UDPCamReceiver   │   │
+                                               │   │  YOLO Tracker     │   │
+                                               │   │  OpenVINO         │   │
+                                               │   └─────────┬─────────┘   │
+                                               └─────────────┼─────────────┘
+                                                             │ USB Serial (/dev/ttyACM0)
+                                                             ▼
+                                               ┌───────────────────────────┐
+                                               │  Arduino Gun Controller   │
+                                               │  (Pan/Tilt Servos + Fire) │
+                                               └───────────────────────────┘
+        </code></pre>
+      </div>
+      <div class="card">
+        <div class="card-title">ℹ️ System Info</div>
+        <div class="stat-grid" id="about-stats">
+          <div class="stat"><div class="val" style="font-size:1rem">—</div><div class="key">Loading...</div></div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<div id="toast-host"></div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────
+let CFG   = {};
+let CAM   = {};
+let SYS   = {};
+
+// ── Nav ────────────────────────────────────────────────────────────────────
+function show(page){
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('nav a').forEach(a => a.classList.remove('active'));
+  document.getElementById('page-'+page).classList.add('active');
+  document.querySelector(`nav a[data-page="${page}"]`).classList.add('active');
+}
+
+// ── Toast ──────────────────────────────────────────────────────────────────
+function toast(msg, type='ok'){
+  const host = document.getElementById('toast-host');
+  const el = document.createElement('div');
+  el.className = 'toast ' + type;
+  el.textContent = msg;
+  host.appendChild(el);
+  setTimeout(() => { el.style.opacity='0'; el.style.transition='opacity .4s';
+    setTimeout(()=>el.remove(), 400); }, 3200);
+}
+
+// ── API ────────────────────────────────────────────────────────────────────
+async function api(method, path, body){
+  const opts = { method, headers:{'Content-Type':'application/json'} };
+  if(body) opts.body = JSON.stringify(body);
+  const r = await fetch(path, opts);
+  return r.json();
+}
+
+// ── Load all data ──────────────────────────────────────────────────────────
+async function loadAll(){
+  try{
+    const [cfg, cam, sys] = await Promise.all([
+      api('GET','/api/config'),
+      api('GET','/api/esp32cam'),
+      api('GET','/api/system'),
+    ]);
+    CFG = cfg.config || {};
+    CAM = cam.esp32cam || {};
+    SYS = sys;
+    applyConfig();
+    applyEsp32Cam();
+    applySystem();
+    toast('Configuration loaded', 'ok');
+  } catch(e){
+    toast('Failed to load: ' + e.message, 'err');
+  }
+}
+
+// ── Populate form fields ───────────────────────────────────────────────────
+function v(id, val){
+  const el = document.getElementById(id);
+  if(!el || val == null) return;
+  if(el.tagName === 'SELECT'){
+    const str = String(val);
+    for(const opt of el.options){ if(opt.value === str){ el.value = str; break; } }
+  } else {
+    el.value = val;
+  }
+}
+
+function applyConfig(){
+  // Model
+  v('model-path', CFG.MODEL_PATH);
+  v('ov-model-path', CFG.OPENVINO_MODEL_PATH);
+  v('ov-device', CFG.OPENVINO_DEVICE);
+  v('camera-source', CFG.CAMERA_SOURCE);
+  v('frame-w', CFG.FRAME_WIDTH);
+  v('frame-h', CFG.FRAME_HEIGHT);
+  // Serial
+  v('serial-port', CFG.SERIAL_PORT);
+  if(CFG.SERIAL_BAUD) v('serial-baud', String(CFG.SERIAL_BAUD));
+  v('pan-neutral', CFG.SERVO_PAN_NEUTRAL);
+  document.getElementById('pan-neutral-val').textContent = (CFG.SERVO_PAN_NEUTRAL||90)+'°';
+  v('tilt-neutral', CFG.SERVO_TILT_NEUTRAL);
+  document.getElementById('tilt-neutral-val').textContent = (CFG.SERVO_TILT_NEUTRAL||90)+'°';
+  // Network
+  v('udp-host', CFG.UDP_HOST);
+  v('udp-port', CFG.UDP_PORT);
+  // Tracking
+  v('farm-side', CFG.FARM_SIDE);
+  v('tol-x', CFG.CENTER_TOLERANCE_X);
+  document.getElementById('tol-x-val').textContent=(CFG.CENTER_TOLERANCE_X||40)+'px';
+  v('tol-y', CFG.CENTER_TOLERANCE_Y);
+  document.getElementById('tol-y-val').textContent=(CFG.CENTER_TOLERANCE_Y||40)+'px';
+  v('deadband', CFG.DEADBAND);
+  document.getElementById('deadband-val').textContent=(CFG.DEADBAND||15)+'px';
+  if(CFG.KP != null){ v('kp', CFG.KP);
+    document.getElementById('kp-val').textContent=parseFloat(CFG.KP).toFixed(2); }
+  v('max-step', CFG.MAX_ANGLE_STEP);
+  document.getElementById('max-step-val').textContent=(CFG.MAX_ANGLE_STEP||10)+'°';
+  if(CFG.FARM_SHOOT_EXCLUDE != null)
+    v('exclude-classes', Array.isArray(CFG.FARM_SHOOT_EXCLUDE)
+      ? CFG.FARM_SHOOT_EXCLUDE.join(', ') : String(CFG.FARM_SHOOT_EXCLUDE));
+}
+
+function applyEsp32Cam(){
+  v('cam-ssid', CAM.WIFI_SSID);
+  v('cam-pass', CAM.WIFI_PASS);
+  v('cam-ip',   CAM.SERVER_IP);
+  v('cam-port', CAM.SERVER_PORT);
+  v('cam-framesize', CAM.FRAME_SIZE);
+  if(CAM.JPEG_QUALITY){
+    document.getElementById('cam-quality').value = CAM.JPEG_QUALITY;
+    document.getElementById('cam-quality-val').textContent = CAM.JPEG_QUALITY;
+  }
+}
+
+function applySystem(){
+  // Local IP
+  const ip = SYS.local_ip || '127.0.0.1';
+  document.getElementById('local-ip').textContent = '🌐 ' + ip;
+  document.getElementById('cam-ip-hint').textContent =
+    'Detected local IP: ' + ip + '  (use this in ESP32-CAM\'s SERVER_IP)';
+
+  // Port pills
+  const pills = document.getElementById('port-pills');
+  if(SYS.serial_ports && SYS.serial_ports.length){
+    pills.innerHTML = SYS.serial_ports.map(p =>
+      `<span class="port-pill" onclick="document.getElementById('serial-port').value='${p.device}';toast('Selected ${p.device}','info')"
+         title="${p.description}">${p.device}</span>`
+    ).join('');
+  } else {
+    pills.innerHTML = '<span style="color:var(--muted);font-size:.8rem">No USB/ACM ports detected</span>';
+  }
+
+  // OpenVINO devices
+  const devRow = document.getElementById('ov-devices-row');
+  if(SYS.openvino_devices && SYS.openvino_devices.length){
+    devRow.innerHTML = SYS.openvino_devices.map(d =>
+      `<div class="stat"><div class="val" style="font-size:.9rem">${d}</div><div class="key">OpenVINO</div></div>`
+    ).join('');
+  } else {
+    devRow.innerHTML = '<div class="stat"><div class="val" style="font-size:.9rem">CPU</div><div class="key">OpenVINO (default)</div></div>';
+  }
+
+  // About stats
+  document.getElementById('about-stats').innerHTML = `
+    <div class="stat"><div class="val" style="font-size:.9rem">${ip}</div><div class="key">Local IP</div></div>
+    <div class="stat"><div class="val" style="font-size:.9rem">${SYS.serial_ports?SYS.serial_ports.length:0}</div><div class="key">Serial Ports</div></div>
+    <div class="stat"><div class="val" style="font-size:.9rem">${SYS.openvino_devices?SYS.openvino_devices.join(', '):'CPU'}</div><div class="key">OV Devices</div></div>
+    <div class="stat"><div class="val" style="font-size:.9rem">${SYS.ino_exists?'✅':'❌'}</div><div class="key">esp32cam.ino found</div></div>
+  `;
+
+  // Server dot
+  document.getElementById('srv-dot').style.background = 'var(--ok)';
+  document.getElementById('srv-label').textContent = 'WebUI running';
+}
+
+// ── Save helpers ──────────────────────────────────────────────────────────
+function g(id){ return document.getElementById(id)?.value ?? null; }
+function gInt(id){ const v=g(id); return v==null?null:parseInt(v); }
+function gFloat(id){ const v=g(id); return v==null?null:parseFloat(v); }
+
+async function saveEsp32Cam(){
+  const data = {
+    WIFI_SSID:    g('cam-ssid'),
+    WIFI_PASS:    g('cam-pass'),
+    SERVER_IP:    g('cam-ip'),
+    SERVER_PORT:  gInt('cam-port'),
+    FRAME_SIZE:   g('cam-framesize'),
+    JPEG_QUALITY: gInt('cam-quality'),
+  };
+  const res = await api('POST', '/api/esp32cam', data);
+  if(res.ok) toast('✅ esp32cam.ino saved — re-flash the board!', 'ok');
+  else toast('❌ ' + (res.error||'Error'), 'err');
+}
+
+async function saveSerial(){
+  const data = {
+    SERIAL_PORT:       g('serial-port') || null,
+    SERIAL_BAUD:       gInt('serial-baud'),
+    SERVO_PAN_NEUTRAL: gInt('pan-neutral'),
+    SERVO_TILT_NEUTRAL:gInt('tilt-neutral'),
+  };
+  const res = await api('POST', '/api/config', data);
+  if(res.ok) toast('✅ Serial settings saved to config.py', 'ok');
+  else toast('❌ ' + (res.error||'Error'), 'err');
+}
+
+async function saveModel(){
+  const data = {
+    MODEL_PATH:         g('model-path'),
+    OPENVINO_MODEL_PATH:g('ov-model-path') || null,
+    OPENVINO_DEVICE:    g('ov-device'),
+    CAMERA_SOURCE:      g('camera-source'),
+    FRAME_WIDTH:        gInt('frame-w'),
+    FRAME_HEIGHT:       gInt('frame-h'),
+  };
+  const res = await api('POST', '/api/config', data);
+  if(res.ok) toast('✅ Model settings saved to config.py', 'ok');
+  else toast('❌ ' + (res.error||'Error'), 'err');
+}
+
+async function saveTracking(){
+  const rawExclude = g('exclude-classes') || '0';
+  const exclude = rawExclude.split(',').map(x=>parseInt(x.trim())).filter(n=>!isNaN(n));
+  const data = {
+    FARM_SIDE:          g('farm-side'),
+    CENTER_TOLERANCE_X: gInt('tol-x'),
+    CENTER_TOLERANCE_Y: gInt('tol-y'),
+    DEADBAND:           gInt('deadband'),
+    KP:                 gFloat('kp'),
+    MAX_ANGLE_STEP:     gInt('max-step'),
+    FARM_SHOOT_EXCLUDE: exclude,
+  };
+  const res = await api('POST', '/api/config', data);
+  if(res.ok) toast('✅ Tracking settings saved to config.py', 'ok');
+  else toast('❌ ' + (res.error||'Error'), 'err');
+}
+
+async function saveNetwork(){
+  const data = {
+    UDP_HOST: g('udp-host'),
+    UDP_PORT: gInt('udp-port'),
+  };
+  // Also sync UDP port to ESP32-CAM ino
+  const data2 = { SERVER_PORT: data.UDP_PORT };
+  const [r1, r2] = await Promise.all([
+    api('POST', '/api/config', data),
+    api('POST', '/api/esp32cam', data2),
+  ]);
+  if(r1.ok) toast('✅ Network settings saved', 'ok');
+  else toast('❌ ' + (r1.error||'Error'), 'err');
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// Process Control
+// ══════════════════════════════════════════════════════════════════════
+
+let _sseSource = null;
+let _statusInterval = null;
+let _uptime = null;
+
+function getLaunchArgs(){
+  return {
+    source:   g('run-source') || 'udp',
+    udp_port: gInt('run-udp-port') || undefined,
+    no_gui:   document.getElementById('run-no-gui')?.checked || false,
+  };
+}
+
+async function startProcess(){
+  setBusy(true);
+  const args = getLaunchArgs();
+  const res = await api('POST', '/api/process/start', args);
+  setBusy(false);
+  if(res.ok){
+    toast('🚀 Tracking system started (pid ' + res.pid + ')', 'ok');
+    connectSSE();
+  } else {
+    toast('❌ ' + (res.error || 'Could not start'), 'err');
+  }
+  await refreshStatus();
+}
+
+async function stopProcess(){
+  setBusy(true);
+  const res = await api('POST', '/api/process/stop', {});
+  setBusy(false);
+  if(res.ok) toast('🛑 Tracking system stopped.', 'info');
+  else toast('❌ ' + (res.error || 'Could not stop'), 'err');
+  await refreshStatus();
+}
+
+async function restartProcess(){
+  setBusy(true);
+  appendLog({t: new Date().toLocaleTimeString('en',{hour12:false}), msg:'[system] Restarting…'});
+  const args = getLaunchArgs();
+  const res = await api('POST', '/api/process/restart', args);
+  setBusy(false);
+  if(res.ok) toast('🔄 Restarted (pid ' + res.pid + ')', 'ok');
+  else toast('❌ ' + (res.error || 'Could not restart'), 'err');
+  await refreshStatus();
+}
+
+function setBusy(busy){
+  document.getElementById('btn-start').disabled   = busy;
+  document.getElementById('btn-stop').disabled    = busy;
+  document.getElementById('btn-restart').disabled = busy;
+}
+
+async function refreshStatus(){
+  try {
+    const d = await api('GET', '/api/process');
+    updateStatusUI(d.status);
+  } catch(e) {}
+}
+
+function updateStatusUI(st){
+  const banner = document.getElementById('proc-banner');
+  const dot    = document.getElementById('proc-dot');
+  const label  = document.getElementById('proc-label');
+  const meta   = document.getElementById('proc-meta');
+  const bStart   = document.getElementById('btn-start');
+  const bStop    = document.getElementById('btn-stop');
+  const bRestart = document.getElementById('btn-restart');
+
+  if(st.running){
+    banner.className  = 'proc-banner running';
+    dot.className     = 'proc-status-dot running';
+    label.textContent = '● Running';
+    const up = st.uptime != null ? fmtUptime(st.uptime) : '—';
+    meta.textContent  = `pid ${st.pid}  ·  uptime ${up}`;
+    bStart.disabled   = true;
+    bStop.disabled    = false;
+    bRestart.disabled = false;
+  } else {
+    banner.className  = 'proc-banner stopped';
+    dot.className     = 'proc-status-dot stopped';
+    label.textContent = '◼ Stopped';
+    meta.textContent  = 'main.py is not running';
+    bStart.disabled   = false;
+    bStop.disabled    = true;
+    bRestart.disabled = true;
+    disconnectSSE();
+  }
+}
+
+function fmtUptime(s){
+  if(s < 60) return s.toFixed(0) + 's';
+  if(s < 3600) return Math.floor(s/60) + 'm ' + (s%60|0) + 's';
+  return Math.floor(s/3600) + 'h ' + Math.floor((s%3600)/60) + 'm';
+}
+
+// ── SSE live log stream ───────────────────────────────────────────────
+function connectSSE(){
+  if(_sseSource) return;  // already connected
+  _sseSource = new EventSource('/api/process/logs/stream');
+  _sseSource.onmessage = e => {
+    try { appendLog(JSON.parse(e.data)); } catch(_){}
+  };
+  _sseSource.onerror = () => {
+    // Retry on disconnect — browser retries automatically, but clean up ref
+    _sseSource = null;
+  };
+}
+
+function disconnectSSE(){
+  if(_sseSource){ _sseSource.close(); _sseSource = null; }
+}
+
+// ── Terminal rendering ────────────────────────────────────────────────
+function appendLog(entry){
+  const term = document.getElementById('terminal');
+  if(!term) return;
+
+  const line = document.createElement('div');
+  line.className = 'log-line';
+
+  const ts = document.createElement('span');
+  ts.className = 'log-ts';
+  ts.textContent = entry.t || '';
+
+  const msg = document.createElement('span');
+  const text = entry.msg || '';
+
+  // Colour coding by content keywords
+  if(text.startsWith('[system]'))          msg.className = 'log-msg system';
+  else if(/error|traceback|exception|failed/i.test(text)) msg.className = 'log-msg err';
+  else if(/warning|warn/i.test(text))      msg.className = 'log-msg warn';
+  else if(/ok|success|started|connected/i.test(text))    msg.className = 'log-msg ok';
+  else                                     msg.className = 'log-msg';
+
+  msg.textContent = text;
+  line.appendChild(ts);
+  line.appendChild(msg);
+  term.appendChild(line);
+
+  // Keep buffer lean (max 600 DOM lines)
+  while(term.childElementCount > 600) term.removeChild(term.firstChild);
+
+  if(document.getElementById('autoscroll-chk')?.checked){
+    term.scrollTop = term.scrollHeight;
+  }
+}
+
+function clearTerminal(){
+  const term = document.getElementById('terminal');
+  if(term) term.innerHTML = '';
+}
+
+// ── Periodic status refresh (every 3s) ───────────────────────────────
+function startStatusPolling(){
+  if(_statusInterval) return;
+  _statusInterval = setInterval(refreshStatus, 3000);
+}
+
+// ── Boot ───────────────────────────────────────────────────────────────────
+(async function boot(){
+  document.getElementById('srv-dot').style.background = 'var(--warn)';
+  document.getElementById('srv-label').textContent = 'Loading...';
+
+  // Load config + system info
+  await loadAll();
+
+  // Check if process is already running when the page opens
+  await refreshStatus();
+
+  // Pipe live logs from the start so we always have output history
+  connectSSE();
+
+  // Poll status in background
+  startStatusPolling();
+
+  // Sync run-source selector with config
+  if(CFG.CAMERA_SOURCE) v('run-source', String(CFG.CAMERA_SOURCE));
+})();
+</script>
+</body>
+</html>
+

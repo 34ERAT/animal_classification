@@ -3,10 +3,10 @@ import asyncio
 import cv2
 import config
 from serial_controller import GunSerialController
-from server import ESP32Server
+from server import UDPCamReceiver
 
 
-async def vision_loop(server, gun_ctrl, camera_source=None, no_gui=False):
+async def vision_loop(cam, gun_ctrl, camera_source=None, no_gui=False):
     try:
         from vision import YOLOTracker
         tracker = YOLOTracker(gun_controller=gun_ctrl)
@@ -40,7 +40,7 @@ async def vision_loop(server, gun_ctrl, camera_source=None, no_gui=False):
     try:
         while True:
             if is_udp_cam:
-                ret, frame = await server.get_frame_async(timeout=0.5)
+                ret, frame = await cam.get_frame_async(timeout=0.5)
                 if not ret or frame is None:
                     retCount += 1
                     if retCount % 10 == 0:
@@ -84,32 +84,27 @@ async def vision_loop(server, gun_ctrl, camera_source=None, no_gui=False):
 
 async def main(args=None):
     udp_port = args.udp_port if args and args.udp_port else config.UDP_PORT
-    ws_port = args.ws_port if args and args.ws_port else config.PORT
     source = args.source if args and args.source else config.CAMERA_SOURCE
     no_gui = args.no_gui if args else False
 
-    server = ESP32Server(
-        config.HOST,
-        ws_port,
-        udp_host=config.UDP_HOST,
-        udp_port=udp_port,
-    )
-    await server.start()
+    cam = UDPCamReceiver(host=config.UDP_HOST, port=udp_port)
+    loop = asyncio.get_running_loop()
+    cam.start(loop=loop)
 
     # Initialise serial link to the Arduino gun-controller
     gun_ctrl = GunSerialController()
 
     try:
-        await vision_loop(server, gun_ctrl, camera_source=source, no_gui=no_gui)
+        await vision_loop(cam, gun_ctrl, camera_source=source, no_gui=no_gui)
     finally:
         print("Application Shutting down")
         gun_ctrl.close()
-        await server.close()
+        cam.stop()
 
 
 def run():
     parser = argparse.ArgumentParser(
-        description="Unified Animal Tracking: runs UDP ESP32-CAM server and YOLO model inference in one command."
+        description="Unified Animal Tracking: runs UDP ESP32-CAM receiver and YOLO model inference in one command."
     )
     parser.add_argument(
         "--source",
@@ -122,12 +117,6 @@ def run():
         type=int,
         default=None,
         help=f"UDP port for ESP32-CAM stream (default: {config.UDP_PORT})",
-    )
-    parser.add_argument(
-        "--ws-port",
-        type=int,
-        default=None,
-        help=f"WebSocket port for Turret commands (default: {config.PORT})",
     )
     parser.add_argument(
         "--no-gui",
