@@ -14,7 +14,8 @@ OPENVINO_MODEL_PATH = "yolo11n_openvino_model"
 # "AUTO" – OpenVINO picks the fastest available device automatically
 OPENVINO_DEVICE = "GPU"
 
-CAMERA_SOURCE = 0
+# Camera source: "udp" to stream from ESP32-CAM via UDP, or integer (e.g. 0) for USB webcam
+CAMERA_SOURCE = "udp"
 
 FRAME_WIDTH = 640
 FRAME_HEIGHT = 480
@@ -32,9 +33,14 @@ KP = 0.08
 # Max angle nudge sent per frame (degrees) — scales with how far off-center the target is
 MAX_ANGLE_STEP = 10
 
-# WebSocket Config
+# WebSocket Config (Turret ESP32 commands)
 HOST = "0.0.0.0"
 PORT = 8765
+
+# ── UDP ESP32-CAM Stream Config ───────────────────────────────────────────────
+# UDP port and host to receive JPEG video stream (matches SERVER_PORT in esp32cam/esp32cam.ino)
+UDP_HOST = "0.0.0.0"
+UDP_PORT = 5005
 
 # ── Farm / Shooting Zone ──────────────────────────────────────────────────────
 # The frame is split vertically in half.
