@@ -139,6 +139,18 @@
   .stat .val{font-size:1.5rem;font-weight:700;color:var(--accent)}
   .stat .key{font-size:.72rem;color:var(--muted);margin-top:3px}
 
+  /* ── Mode Switcher & Presets ── */
+  .mode-toggle-group{display:inline-flex;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:4px;gap:6px}
+  .mode-btn{background:transparent;border:none;color:var(--muted);padding:8px 16px;border-radius:4px;cursor:pointer;font-weight:600;font-size:.85rem;display:flex;align-items:center;gap:7px;transition:all .2s;font-family:inherit}
+  .mode-btn:hover{color:var(--text);background:rgba(255,255,255,.05)}
+  .mode-btn.active.guard{background:rgba(255,75,75,.18);color:#ff5252;border:1px solid rgba(255,75,75,.4);box-shadow:0 0 12px rgba(255,75,75,.2)}
+  .mode-btn.active.tracking{background:rgba(0,190,255,.18);color:#00c2ff;border:1px solid rgba(0,190,255,.4);box-shadow:0 0 12px rgba(0,190,255,.2)}
+  .badge-guard{background:rgba(255,75,75,.15);color:#ff5252;border:1px solid rgba(255,75,75,.35);padding:3px 10px;border-radius:12px;font-size:.78rem;font-weight:600;display:inline-flex;align-items:center;gap:5px}
+  .badge-tracking{background:rgba(0,190,255,.15);color:#00c2ff;border:1px solid rgba(0,190,255,.35);padding:3px 10px;border-radius:12px;font-size:.78rem;font-weight:600;display:inline-flex;align-items:center;gap:5px}
+  .preset-pills{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+  .preset-pill{background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:14px;padding:5px 12px;font-size:.78rem;cursor:pointer;transition:all .15s}
+  .preset-pill:hover{border-color:var(--accent);color:var(--accent)}
+
   /* ── Code block ── */
   pre{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);
     padding:14px;font-size:.78rem;overflow-x:auto;line-height:1.65;color:var(--muted)}
@@ -277,6 +289,29 @@
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.5"/></svg>
             Restart
           </button>
+        </div>
+      </div>
+
+      <!-- Mode Switcher Card -->
+      <div class="card" style="margin-bottom:18px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:14px;">
+          <div>
+            <div style="font-weight:700;font-size:1.02rem;display:flex;align-items:center;gap:10px;">
+              <span>Operating Mode</span>
+              <span id="run-mode-pill" class="badge-guard">🛡️ Guard Mode</span>
+            </div>
+            <div style="font-size:.82rem;color:var(--muted);margin-top:4px;" id="run-mode-desc">
+              Guard Mode: Monitors the restricted Farm Region and neutralizes approaching or intruding animals and bottles.
+            </div>
+          </div>
+          <div class="mode-toggle-group">
+            <button type="button" class="mode-btn active guard" id="mode-btn-guard" onclick="setSystemMode('guard')">
+              🛡️ Guard Mode
+            </button>
+            <button type="button" class="mode-btn" id="mode-btn-tracking" onclick="setSystemMode('tracking')">
+              🎯 Bottle Tracking Mode
+            </button>
+          </div>
         </div>
       </div>
 
@@ -533,20 +568,98 @@
 
     <!-- ═══ PAGE: TRACKING ZONE ═══ -->
     <div class="page" id="page-tracking">
+
+      <!-- Operating Mode Selection Card -->
       <div class="card">
         <div class="card-title">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>
-          Tracking &amp; Shooting Zone
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polygon points="12 8 8 12 12 16 16 12 12 8"/></svg>
+          System Operating Mode
+        </div>
+        <div class="info-box">
+          Choose the active behavior. You can also switch modes instantly at any time from the <strong>Run System</strong> tab without stopping the process!
+        </div>
+        <div class="card-grid two">
+          <div class="mode-card-radio" id="mode-card-guard" onclick="setSystemMode('guard')">
+            <input type="radio" name="sys-mode" id="radio-mode-guard" checked/>
+            <div>
+              <div style="font-weight:700;color:#ff5252;display:flex;align-items:center;gap:6px">
+                🛡️ Guard Mode (Farm Defense)
+              </div>
+              <div style="font-size:.78rem;color:var(--muted);margin-top:4px;line-height:1.5">
+                Restricts turret targeting to the compact Farm Region. Only aims and fires at animals and bottles approaching or entering the farm boundary.
+              </div>
+            </div>
+          </div>
+          <div class="mode-card-radio" id="mode-card-tracking" onclick="setSystemMode('tracking')">
+            <input type="radio" name="sys-mode" id="radio-mode-tracking"/>
+            <div>
+              <div style="font-weight:700;color:#00c2ff;display:flex;align-items:center;gap:6px">
+                🎯 Bottle Tracking Mode (Full FOV)
+              </div>
+              <div style="font-size:.78rem;color:var(--muted);margin-top:4px;line-height:1.5">
+                Actively tracks and centers pan/tilt servos on bottles across the entire camera field of view. Firing is disabled for safe observation and smooth tracking.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Farm Region Configuration Card -->
+      <div class="card">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
+          Compact Farm Region (Guard Zone)
+        </div>
+        <div class="info-box">
+          The farm region is now a <strong>compact zone (~25% of the frame)</strong> instead of half the screen. This allows the system to monitor approaching animals before they breach the farm boundary.
         </div>
         <div class="card-grid">
           <div class="field">
-            <label>Farm Side (Shooting Zone)</label>
-            <select id="farm-side">
-              <option value="left">Left half — shooting zone is on the LEFT</option>
-              <option value="right">Right half — shooting zone is on the RIGHT</option>
+            <label>Farm Zone Position</label>
+            <select id="farm-side" onchange="applyZonePreset(this.value)">
+              <option value="left">Left (Compact ~240x320 px)</option>
+              <option value="right">Right (Compact ~240x320 px)</option>
+              <option value="center">Center Zone (~240x320 px)</option>
+              <option value="custom">Custom Coordinates</option>
             </select>
-            <div class="field-hint">The frame is split in half; targets in the selected side are engaged.</div>
           </div>
+          <div class="field">
+            <label>Quick Presets</label>
+            <div class="preset-pills">
+              <span class="preset-pill" onclick="applyZonePreset('left')">Left (40,80,280,400)</span>
+              <span class="preset-pill" onclick="applyZonePreset('right')">Right (360,80,600,400)</span>
+              <span class="preset-pill" onclick="applyZonePreset('center')">Center (200,80,440,400)</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card-grid" style="margin-top:14px">
+          <div class="field">
+            <label>X1 (Left Bound, px)</label>
+            <input type="number" id="farm-x1" min="0" max="640" value="40"/>
+          </div>
+          <div class="field">
+            <label>Y1 (Top Bound, px)</label>
+            <input type="number" id="farm-y1" min="0" max="480" value="80"/>
+          </div>
+          <div class="field">
+            <label>X2 (Right Bound, px)</label>
+            <input type="number" id="farm-x2" min="0" max="640" value="280"/>
+          </div>
+          <div class="field">
+            <label>Y2 (Bottom Bound, px)</label>
+            <input type="number" id="farm-y2" min="0" max="480" value="400"/>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tracking Parameters Card -->
+      <div class="card">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>
+          Turret Servo &amp; Tracking Tuning
+        </div>
+        <div class="card-grid">
           <div class="field">
             <label>Center Tolerance X (px)</label>
             <div class="range-wrap">
@@ -554,7 +667,7 @@
                 oninput="document.getElementById('tol-x-val').textContent=this.value+'px'"/>
               <span class="range-val" id="tol-x-val">40px</span>
             </div>
-            <div class="field-hint">Horizontal dead zone — inside this = "locked on".</div>
+            <div class="field-hint">Horizontal error margin — inside this = "locked on".</div>
           </div>
           <div class="field">
             <label>Center Tolerance Y (px)</label>
@@ -563,6 +676,7 @@
                 oninput="document.getElementById('tol-y-val').textContent=this.value+'px'"/>
               <span class="range-val" id="tol-y-val">40px</span>
             </div>
+            <div class="field-hint">Vertical error margin — inside this = "locked on".</div>
           </div>
           <div class="field">
             <label>Deadband (px)</label>
@@ -571,7 +685,7 @@
                 oninput="document.getElementById('deadband-val').textContent=this.value+'px'"/>
               <span class="range-val" id="deadband-val">15px</span>
             </div>
-            <div class="field-hint">Minimum error before servo moves at all.</div>
+            <div class="field-hint">Minimum pixel offset before servo moves.</div>
           </div>
           <div class="field">
             <label>Proportional Gain Kp</label>
@@ -598,9 +712,10 @@
                 oninput="document.getElementById('trail-length-val').textContent=this.value"/>
               <span class="range-val" id="trail-length-val">10</span>
             </div>
-            <div class="field-hint">Number of past centroid points shown as a movement trail. Short = clean, long = more history.</div>
+            <div class="field-hint">Past centroid points shown as a movement trail (short and neat).</div>
           </div>
         </div>
+
 
         <hr class="divider"/>
 
@@ -770,7 +885,64 @@ function v(id, val){
   }
 }
 
+function setModeUI(mode){
+  const isGuard = (mode === 'guard');
+  const btnG = document.getElementById('mode-btn-guard');
+  const btnT = document.getElementById('mode-btn-tracking');
+  const pill = document.getElementById('run-mode-pill');
+  const desc = document.getElementById('run-mode-desc');
+
+  if(btnG && btnT){
+    btnG.className = 'mode-btn' + (isGuard ? ' active guard' : '');
+    btnT.className = 'mode-btn' + (!isGuard ? ' active tracking' : '');
+  }
+  if(pill){
+    pill.className = isGuard ? 'badge-guard' : 'badge-tracking';
+    pill.textContent = isGuard ? '🛡️ Guard Mode' : '🎯 Bottle Tracking Mode';
+  }
+  if(desc){
+    desc.textContent = isGuard
+      ? 'Guard Mode: Monitors the restricted Farm Region and neutralizes approaching or intruding animals and bottles.'
+      : 'Bottle Tracking Mode: Smoothly tracks and centers on bottles anywhere across the full camera field of view.';
+  }
+
+  // Radio cards in Tracking tab
+  const radG = document.getElementById('radio-mode-guard');
+  const radT = document.getElementById('radio-mode-tracking');
+  const cardG = document.getElementById('mode-card-guard');
+  const cardT = document.getElementById('mode-card-tracking');
+  if(radG) radG.checked = isGuard;
+  if(radT) radT.checked = !isGuard;
+  if(cardG) cardG.className = 'mode-card-radio' + (isGuard ? ' selected' : '');
+  if(cardT) cardT.className = 'mode-card-radio' + (!isGuard ? ' selected' : '');
+}
+
+async function setSystemMode(mode){
+  setModeUI(mode);
+  const res = await api('POST', '/api/mode', { mode: mode });
+  if(res.ok){
+    CFG.SYSTEM_MODE = mode;
+    toast(mode === 'guard' ? '🛡️ Switched to Guard Mode' : '🎯 Switched to Bottle Tracking Mode', 'ok');
+  } else {
+    toast('❌ Failed to switch mode: ' + (res.error||'Error'), 'err');
+  }
+}
+
+function applyZonePreset(preset){
+  v('farm-side', preset);
+  if(preset === 'left'){
+    v('farm-x1', 40); v('farm-y1', 80); v('farm-x2', 280); v('farm-y2', 400);
+  } else if(preset === 'right'){
+    v('farm-x1', 360); v('farm-y1', 80); v('farm-x2', 600); v('farm-y2', 400);
+  } else if(preset === 'center'){
+    v('farm-x1', 200); v('farm-y1', 80); v('farm-x2', 440); v('farm-y2', 400);
+  }
+}
+
 function applyConfig(){
+  // Mode
+  setModeUI(CFG.SYSTEM_MODE || 'guard');
+
   // Model
   v('model-path', CFG.MODEL_PATH);
   v('ov-model-path', CFG.OPENVINO_MODEL_PATH);
@@ -788,8 +960,13 @@ function applyConfig(){
   // Network
   v('udp-host', CFG.UDP_HOST);
   v('udp-port', CFG.UDP_PORT);
-  // Tracking
-  v('farm-side', CFG.FARM_SIDE);
+  // Tracking & Farm Zone
+  v('farm-side', CFG.FARM_SIDE || 'left');
+  v('farm-x1', CFG.FARM_X1 != null ? CFG.FARM_X1 : 40);
+  v('farm-y1', CFG.FARM_Y1 != null ? CFG.FARM_Y1 : 80);
+  v('farm-x2', CFG.FARM_X2 != null ? CFG.FARM_X2 : 280);
+  v('farm-y2', CFG.FARM_Y2 != null ? CFG.FARM_Y2 : 400);
+
   v('tol-x', CFG.CENTER_TOLERANCE_X);
   document.getElementById('tol-x-val').textContent=(CFG.CENTER_TOLERANCE_X||40)+'px';
   v('tol-y', CFG.CENTER_TOLERANCE_Y);
@@ -910,8 +1087,14 @@ async function saveModel(){
 async function saveTracking(){
   const rawExclude = g('exclude-classes') || '0';
   const exclude = rawExclude.split(',').map(x=>parseInt(x.trim())).filter(n=>!isNaN(n));
+  const selectedMode = document.getElementById('radio-mode-tracking')?.checked ? 'tracking' : 'guard';
   const data = {
+    SYSTEM_MODE:         selectedMode,
     FARM_SIDE:           g('farm-side'),
+    FARM_X1:             gInt('farm-x1'),
+    FARM_Y1:             gInt('farm-y1'),
+    FARM_X2:             gInt('farm-x2'),
+    FARM_Y2:             gInt('farm-y2'),
     CENTER_TOLERANCE_X:  gInt('tol-x'),
     CENTER_TOLERANCE_Y:  gInt('tol-y'),
     DEADBAND:            gInt('deadband'),
@@ -921,8 +1104,12 @@ async function saveTracking(){
     FARM_SHOOT_EXCLUDE:  exclude,
   };
   const res = await api('POST', '/api/config', data);
-  if(res.ok) toast('✅ Tracking settings saved to config.py', 'ok');
-  else toast('❌ ' + (res.error||'Error'), 'err');
+  if(res.ok){
+    setModeUI(selectedMode);
+    toast('✅ Tracking & Zone settings saved to config.py', 'ok');
+  } else {
+    toast('❌ ' + (res.error||'Error'), 'err');
+  }
 }
 
 async function saveNetwork(){

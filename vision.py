@@ -155,22 +155,66 @@ class YOLOTracker:
         # Gun controller (serial link to Arduino)
         self.gun_ctrl = gun_controller
 
-        # ── Farm zone geometry ─────────────────────────────────────────────
-        # The frame is split vertically into two halves.
-        # The FARM_SIDE half is the shooting zone (red overlay).
-        fw = config.FRAME_WIDTH
-        fh = config.FRAME_HEIGHT
-        mid = fw // 2
-        if config.FARM_SIDE == "left":
-            self.farm_x1, self.farm_y1 = 0, 0
-            self.farm_x2, self.farm_y2 = mid, fh
-        else:
-            self.farm_x1, self.farm_y1 = mid, 0
-            self.farm_x2, self.farm_y2 = fw, fh
+        # ── Config reload tracker ──────────────────────────────────────────
+        self._last_config_mtime = 0.0
+        self._frame_count = 0
 
-        # Centre of the Farm zone – used as the turret's reference point
+        # ── Farm zone geometry ─────────────────────────────────────────────
+        self._update_geometry()
+
+    def _update_geometry(self):
+        """Update farm zone bounds from config (supports smaller / compact zones)."""
+        fw = getattr(config, "FRAME_WIDTH", 640)
+        fh = getattr(config, "FRAME_HEIGHT", 480)
+        side = str(getattr(config, "FARM_SIDE", "left")).lower()
+
+        # Base compact box dimensions
+        x1 = getattr(config, "FARM_X1", 40)
+        y1 = getattr(config, "FARM_Y1", 80)
+        x2 = getattr(config, "FARM_X2", 280)
+        y2 = getattr(config, "FARM_Y2", 400)
+        box_w = max(60, x2 - x1)
+        box_h = max(60, y2 - y1)
+
+        if side == "left":
+            self.farm_x1 = max(0, x1)
+            self.farm_y1 = max(0, y1)
+            self.farm_x2 = min(fw, self.farm_x1 + box_w)
+            self.farm_y2 = min(fh, self.farm_y1 + box_h)
+        elif side == "right":
+            self.farm_x2 = min(fw, fw - x1)
+            self.farm_x1 = max(0, self.farm_x2 - box_w)
+            self.farm_y1 = max(0, y1)
+            self.farm_y2 = min(fh, self.farm_y1 + box_h)
+        elif side == "center":
+            self.farm_x1 = max(0, (fw - box_w) // 2)
+            self.farm_y1 = max(0, (fh - box_h) // 2)
+            self.farm_x2 = min(fw, self.farm_x1 + box_w)
+            self.farm_y2 = min(fh, self.farm_y1 + box_h)
+        else:  # "custom"
+            self.farm_x1 = max(0, x1)
+            self.farm_y1 = max(0, y1)
+            self.farm_x2 = min(fw, x2)
+            self.farm_y2 = min(fh, y2)
+
+        # Centre of the Farm zone – used as reference in Guard Mode
         self.farm_cx = (self.farm_x1 + self.farm_x2) // 2
         self.farm_cy = (self.farm_y1 + self.farm_y2) // 2
+
+    def _check_config_reload(self):
+        """Reload config.py on the fly if modified via the web UI."""
+        self._frame_count += 1
+        if self._frame_count % 15 == 0:
+            config_file = getattr(config, "__file__", "config.py")
+            try:
+                mtime = os.path.getmtime(config_file)
+                if mtime > self._last_config_mtime:
+                    import importlib
+                    importlib.reload(config)
+                    self._last_config_mtime = mtime
+                    self._update_geometry()
+            except Exception:
+                pass
 
     # ──────────────────────────────────────────────────────────────────────────
     # Helper: test whether a point is inside the Farm zone
@@ -182,7 +226,7 @@ class YOLOTracker:
         )
 
     # ──────────────────────────────────────────────────────────────────────────
-    # Draw the red Farm overlay on the frame (called once per frame)
+    # Draw the compact Farm overlay (Guard Mode)
     # ──────────────────────────────────────────────────────────────────────────
     def _draw_farm_zone(self, frame: np.ndarray):
         # Semi-transparent red fill
@@ -191,12 +235,12 @@ class YOLOTracker:
             overlay,
             (self.farm_x1, self.farm_y1),
             (self.farm_x2, self.farm_y2),
-            (0, 0, 200),   # BGR red
+            (0, 0, 180),   # BGR red
             -1,
         )
-        cv2.addWeighted(overlay, 0.18, frame, 0.82, 0, frame)
+        cv2.addWeighted(overlay, 0.16, frame, 0.84, 0, frame)
 
-        # Solid red border
+        # Red boundary border
         cv2.rectangle(
             frame,
             (self.farm_x1, self.farm_y1),
@@ -205,11 +249,27 @@ class YOLOTracker:
             2,
         )
 
-        # "FARM" label – top-left corner of the zone
-        label = "FARM"
-        (lw, lh), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 1.0, 2)
-        tx = self.farm_x1 + 8
-        ty = self.farm_y1 + lh + 8
+        # Corner accents for sleek tactical look
+        arm = 16
+        c_col = (0, 80, 255)
+        # Top-left
+        cv2.line(frame, (self.farm_x1, self.farm_y1), (self.farm_x1 + arm, self.farm_y1), c_col, 3)
+        cv2.line(frame, (self.farm_x1, self.farm_y1), (self.farm_x1, self.farm_y1 + arm), c_col, 3)
+        # Top-right
+        cv2.line(frame, (self.farm_x2, self.farm_y1), (self.farm_x2 - arm, self.farm_y1), c_col, 3)
+        cv2.line(frame, (self.farm_x2, self.farm_y1), (self.farm_x2, self.farm_y1 + arm), c_col, 3)
+        # Bottom-left
+        cv2.line(frame, (self.farm_x1, self.farm_y2), (self.farm_x1 + arm, self.farm_y2), c_col, 3)
+        cv2.line(frame, (self.farm_x1, self.farm_y2), (self.farm_x1, self.farm_y2 - arm), c_col, 3)
+        # Bottom-right
+        cv2.line(frame, (self.farm_x2, self.farm_y2), (self.farm_x2 - arm, self.farm_y2), c_col, 3)
+        cv2.line(frame, (self.farm_x2, self.farm_y2), (self.farm_x2, self.farm_y2 - arm), c_col, 3)
+
+        # "FARM REGION" badge at top-left corner of the zone
+        label = "FARM ZONE"
+        (lw, lh), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.65, 2)
+        tx = self.farm_x1 + 6
+        ty = self.farm_y1 + lh + 6
         cv2.rectangle(
             frame,
             (tx - 4, ty - lh - 4),
@@ -222,81 +282,139 @@ class YOLOTracker:
             label,
             (tx, ty),
             cv2.FONT_HERSHEY_SIMPLEX,
-            1.0,
+            0.65,
             (255, 255, 255),
             2,
             cv2.LINE_AA,
         )
 
-        # Vertical divider line at the midpoint of the frame
-        mid_x = config.FRAME_WIDTH // 2
-        cv2.line(frame, (mid_x, 0), (mid_x, frame.shape[0]), (200, 200, 200), 1)
+    # ──────────────────────────────────────────────────────────────────────────
+    # Draw Mode HUD Banner (Top-left of camera display)
+    # ──────────────────────────────────────────────────────────────────────────
+    def _draw_mode_hud(self, frame: np.ndarray, mode: str):
+        if mode == "tracking":
+            text = "MODE: BOTTLE TRACKING (FULL FOV)"
+            bg = (160, 80, 0)      # Deep cyan/blue
+            fg = (255, 255, 255)
+        else:
+            text = "MODE: GUARD (FARM PROTECTION)"
+            bg = (0, 0, 140)       # Deep red
+            fg = (255, 255, 255)
+
+        (tw, th), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.55, 1)
+        bx, by = 12, 12
+        cv2.rectangle(frame, (bx, by), (bx + tw + 14, by + th + 10), (20, 20, 20), -1)
+        cv2.rectangle(frame, (bx, by), (bx + tw + 14, by + th + 10), bg, 2)
+        cv2.putText(frame, text, (bx + 7, by + th + 5), cv2.FONT_HERSHEY_SIMPLEX, 0.55, fg, 1, cv2.LINE_AA)
 
     # ──────────────────────────────────────────────────────────────────────────
-    # Draw lock-on crosshair and send serial command
+    # Guard Mode Lock-On & Fire
     # ──────────────────────────────────────────────────────────────────────────
-    def _handle_bottle_lock(self, frame: np.ndarray, cx: float, cy: float):
+    def _handle_guard_lock(self, frame: np.ndarray, cx: float, cy: float):
         cx_i, cy_i = int(cx), int(cy)
 
         err_x = cx - self.farm_cx
         err_y = cy - self.farm_cy
 
-        # Determine whether we are locked on (centred enough to shoot)
+        # Determine whether target is centered enough to shoot
         locked = (
             abs(err_x) <= config.CENTER_TOLERANCE_X
             and abs(err_y) <= config.CENTER_TOLERANCE_Y
         )
 
-        # ── Crosshair ──────────────────────────────────────────────────────
-        ch_color  = (0, 0, 255) if locked else (0, 215, 255)   # Red if locked, Amber/Yellow if aiming
+        ch_color = (0, 0, 255) if locked else (0, 200, 255)   # Red if locked, Amber if aiming
         ch_radius = 24
-        ch_gap    = 8
+        ch_gap = 8
 
-        # outer circle
+        # Reticle
         cv2.circle(frame, (cx_i, cy_i), ch_radius, ch_color, 2, cv2.LINE_AA)
-        # cross lines (with gap around centre)
         cv2.line(frame, (cx_i - ch_radius - 4, cy_i), (cx_i - ch_gap, cy_i), ch_color, 2, cv2.LINE_AA)
         cv2.line(frame, (cx_i + ch_gap, cy_i), (cx_i + ch_radius + 4, cy_i), ch_color, 2, cv2.LINE_AA)
         cv2.line(frame, (cx_i, cy_i - ch_radius - 4), (cx_i, cy_i - ch_gap), ch_color, 2, cv2.LINE_AA)
         cv2.line(frame, (cx_i, cy_i + ch_gap), (cx_i, cy_i + ch_radius + 4), ch_color, 2, cv2.LINE_AA)
 
-        # ── "LOCKED ON" / "AIMING" label ──────────────────────────────────
-        lock_label = "LOCKED ON" if locked else "AIMING"
-        (lw, lh), _ = cv2.getTextSize(lock_label, cv2.FONT_HERSHEY_SIMPLEX, 0.65, 2)
+        # Label
+        lock_label = "GUARD LOCKED - FIRING" if locked else "GUARD AIMING"
+        (lw, lh), _ = cv2.getTextSize(lock_label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
         lx = cx_i - lw // 2
         ly = cy_i - ch_radius - 8
-        bg_col = (0, 0, 180) if locked else (0, 140, 200)
+        bg_col = (0, 0, 180) if locked else (0, 130, 200)
         cv2.rectangle(frame, (lx - 4, ly - lh - 4), (lx + lw + 4, ly + 4), bg_col, -1)
-        cv2.putText(
-            frame, lock_label, (lx, ly),
-            cv2.FONT_HERSHEY_SIMPLEX, 0.65, (255, 255, 255), 2, cv2.LINE_AA,
-        )
+        cv2.putText(frame, lock_label, (lx, ly), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2, cv2.LINE_AA)
 
-        # ── Compute servo angles and send non-blocking command ─────────────
+        # Send command: fire when locked on in Guard Mode
         if self.gun_ctrl is not None:
             from serial_controller import GunSerialController as _GC
-            pan_angle  = _GC.pixel_error_to_pan(err_x,  config.FRAME_WIDTH)
+            pan_angle  = _GC.pixel_error_to_pan(err_x, config.FRAME_WIDTH)
             tilt_angle = _GC.pixel_error_to_tilt(err_y, config.FRAME_HEIGHT)
             self.gun_ctrl.send_command(tilt_angle, pan_angle, shoot=locked)
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Bottle Tracking Mode (Full FOV tracking, no firing)
+    # ──────────────────────────────────────────────────────────────────────────
+    def _handle_bottle_tracking(self, frame: np.ndarray, cx: float, cy: float):
+        cx_i, cy_i = int(cx), int(cy)
+
+        # Centered relative to full camera frame center
+        cam_cx = getattr(config, "CAMERA_CENTER_X", config.FRAME_WIDTH // 2)
+        cam_cy = getattr(config, "CAMERA_CENTER_Y", config.FRAME_HEIGHT // 2)
+        err_x = cx - cam_cx
+        err_y = cy - cam_cy
+
+        centered = (
+            abs(err_x) <= config.CENTER_TOLERANCE_X
+            and abs(err_y) <= config.CENTER_TOLERANCE_Y
+        )
+
+        ch_color = (255, 220, 0) if centered else (255, 160, 0)  # Cyan/sky blue reticle
+        ch_radius = 26
+        ch_gap = 7
+
+        # Tactical corner bracket crosshair
+        cv2.circle(frame, (cx_i, cy_i), ch_radius, ch_color, 2, cv2.LINE_AA)
+        cv2.line(frame, (cx_i - ch_radius - 5, cy_i), (cx_i - ch_gap, cy_i), ch_color, 2, cv2.LINE_AA)
+        cv2.line(frame, (cx_i + ch_gap, cy_i), (cx_i + ch_radius + 5, cy_i), ch_color, 2, cv2.LINE_AA)
+        cv2.line(frame, (cx_i, cy_i - ch_radius - 5), (cx_i, cy_i - ch_gap), ch_color, 2, cv2.LINE_AA)
+        cv2.line(frame, (cx_i, cy_i + ch_gap), (cx_i, cy_i + ch_radius + 5), ch_color, 2, cv2.LINE_AA)
+
+        # Label
+        track_label = "BOTTLE CENTERED" if centered else "TRACKING BOTTLE"
+        (lw, lh), _ = cv2.getTextSize(track_label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
+        lx = cx_i - lw // 2
+        ly = cy_i - ch_radius - 8
+        bg_col = (160, 90, 0)
+        cv2.rectangle(frame, (lx - 4, ly - lh - 4), (lx + lw + 4, ly + 4), bg_col, -1)
+        cv2.putText(frame, track_label, (lx, ly), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2, cv2.LINE_AA)
+
+        # Send command: smoothly track bottle position without firing (shoot=False)
+        if self.gun_ctrl is not None:
+            from serial_controller import GunSerialController as _GC
+            pan_angle  = _GC.pixel_error_to_pan(err_x, config.FRAME_WIDTH)
+            tilt_angle = _GC.pixel_error_to_tilt(err_y, config.FRAME_HEIGHT)
+            self.gun_ctrl.send_command(tilt_angle, pan_angle, shoot=False)
 
     # ──────────────────────────────────────────────────────────────────────────
     # Main tracking entry-point (called per frame from main.py)
     # ──────────────────────────────────────────────────────────────────────────
     def track(self, frame):
-        # Draw the Farm zone first (behind detections)
-        self._draw_farm_zone(frame)
+        # Auto-detect any live config updates from the web app
+        self._check_config_reload()
+
+        mode = str(getattr(config, "SYSTEM_MODE", "guard")).lower()
+
+        # In Guard mode, draw the compact farm zone
+        if mode == "guard":
+            self._draw_farm_zone(frame)
+
+        # Draw system mode status banner
+        self._draw_mode_hud(frame, mode)
 
         results = self.model.track(
             source=frame,
             stream=False,
             tracker="deepocsort.yaml",
             persist=True,
-            # show=True,
             classes=self.target_classes,
-            # OpenVINO models must receive device="cpu" here — Ultralytics passes
-            # this to PyTorch's select_device() which only understands CUDA strings.
-            # The actual OpenVINO device (CPU / GPU / AUTO) is resolved internally
-            # by the OpenVINO runtime at model-load time via _load_model().
             device="cpu" if self._ov_active else None,
         )
 
@@ -316,7 +434,8 @@ class YOLOTracker:
                         if old_id not in current_ids:
                             del self.track_history[old_id]
 
-                    target_candidates = []
+                    guard_candidates = []
+                    bottle_candidates = []
 
                     for box, id, cls in zip(boxes, ids.tolist(), clss):
                         self.draw_bbox(frame, box, id, cls)
@@ -335,7 +454,6 @@ class YOLOTracker:
                         if len(track) >= 2:
                             c = colors(cls, True)
                             for i in range(1, len(track)):
-                                # Progressive thickness for clean comet tail
                                 t = max(1, int(round(self.polyline_thickness * (i / len(track)))))
                                 pt1 = (int(track[i - 1][0]), int(track[i - 1][1]))
                                 pt2 = (int(track[i][0]), int(track[i][1]))
@@ -350,16 +468,35 @@ class YOLOTracker:
                             -1,
                         )
 
-                        # Collect candidates in Farm zone (excluding protected classes)
-                        if int(cls) not in config.FARM_SHOOT_EXCLUDE and self._in_farm(cx, cy):
-                            dist_to_center = (cx - self.farm_cx) ** 2 + (cy - self.farm_cy) ** 2
-                            target_candidates.append((dist_to_center, cx, cy))
+                        cls_int = int(cls)
+                        cls_name = self.names.get(cls_int, "").lower()
 
-                    # Lock onto the single primary target closest to the farm center
-                    if target_candidates:
-                        target_candidates.sort(key=lambda item: item[0])
-                        _, best_cx, best_cy = target_candidates[0]
-                        self._handle_bottle_lock(frame, best_cx, best_cy)
+                        # Collect candidates for Guard Mode (animals/bottles in Farm Zone, excluding protected)
+                        if cls_int not in config.FARM_SHOOT_EXCLUDE and self._in_farm(cx, cy):
+                            dist_to_farm = (cx - self.farm_cx) ** 2 + (cy - self.farm_cy) ** 2
+                            guard_candidates.append((dist_to_farm, cx, cy))
+
+                        # Collect candidates for Bottle Tracking Mode (bottles across the entire FOV)
+                        if cls_int == config.BOTTLE_CLASS_ID or cls_name == "bottle":
+                            cam_cx = getattr(config, "CAMERA_CENTER_X", config.FRAME_WIDTH // 2)
+                            cam_cy = getattr(config, "CAMERA_CENTER_Y", config.FRAME_HEIGHT // 2)
+                            dist_to_cam = (cx - cam_cx) ** 2 + (cy - cam_cy) ** 2
+                            bottle_candidates.append((dist_to_cam, cx, cy))
+
+                    # ── Execute behavior based on active mode ──
+                    if mode == "tracking":
+                        # Tracking Mode: lock onto bottle anywhere in field of view
+                        if bottle_candidates:
+                            bottle_candidates.sort(key=lambda item: item[0])
+                            _, best_cx, best_cy = bottle_candidates[0]
+                            self._handle_bottle_tracking(frame, best_cx, best_cy)
+                    else:
+                        # Guard Mode: engage target approaching or in farm zone
+                        if guard_candidates:
+                            guard_candidates.sort(key=lambda item: item[0])
+                            _, best_cx, best_cy = guard_candidates[0]
+                            self._handle_guard_lock(frame, best_cx, best_cy)
+
 
 
         return frame

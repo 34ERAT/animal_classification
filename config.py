@@ -42,11 +42,28 @@ TRACK_TRAIL_LENGTH = 10
 UDP_HOST = "0.0.0.0"
 UDP_PORT = 5005
 
+# ── System Operating Mode ─────────────────────────────────────────────────────
+# "guard"    → Guard Mode: Monitors the restricted Farm Region; aims & shoots at
+#              animals or bottles approaching or inside the farm boundary.
+# "tracking" → Bottle Tracking Mode: Tracks bottles anywhere across the full field
+#              of view using pan/tilt servos (no firing).
+SYSTEM_MODE = 'guard'
+
 # ── Farm / Shooting Zone ──────────────────────────────────────────────────────
-# The frame is split vertically in half.
-# FARM_SIDE = "left"  → left half is the Farm (shooting zone, drawn red)
-# FARM_SIDE = "right" → right half is the Farm (shooting zone, drawn red)
+# The Farm Region is a compact protected zone (smaller than half the screen).
+# FARM_SIDE options:
+#   "left"   → Compact zone on the left
+#   "right"  → Compact zone on the right
+#   "center" → Compact zone in the center
+#   "custom" → Uses exact coordinates below
 FARM_SIDE = "left"
+
+# Compact Farm Region coordinates (pixels in 640x480 frame)
+# Default is a bounded ~240x320 box (~25% of the frame, not the whole half)
+FARM_X1 = 40
+FARM_Y1 = 80
+FARM_X2 = 280
+FARM_Y2 = 400
 
 # ── Serial port to Arduino gun-controller ────────────────────────────────────
 # Set to None to disable serial (useful for testing without hardware).

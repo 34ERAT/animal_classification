@@ -202,8 +202,10 @@ def read_config_py() -> dict:
         "CENTER_TOLERANCE_X", "CENTER_TOLERANCE_Y", "DEADBAND",
         "KP", "MAX_ANGLE_STEP",
         "TRACK_TRAIL_LENGTH",
+        "SYSTEM_MODE",
         "UDP_HOST", "UDP_PORT",
         "FARM_SIDE",
+        "FARM_X1", "FARM_Y1", "FARM_X2", "FARM_Y2",
         "SERIAL_PORT", "SERIAL_BAUD",
         "SERVO_PAN_NEUTRAL", "SERVO_TILT_NEUTRAL",
         "FARM_SHOOT_EXCLUDE",
@@ -245,6 +247,8 @@ def write_config_py(updates: dict):
             comment = ("  " + m.group(2).rstrip()) if m.group(2) else ""
             replacement = lambda mx, v=val_str, c=comment: mx.group(1) + v + c
             content = re.sub(pattern, replacement, content, flags=re.MULTILINE)
+        else:
+            content += f"\n{key} = {val_str}\n"
 
     with open(CONFIG_PY, "w", encoding="utf-8") as f:
         f.write(content)
@@ -425,6 +429,10 @@ class ConfigHandler(BaseHTTPRequestHandler):
                 "logs": _pm.recent_logs(150),
             })
 
+        elif path == "/api/mode":
+            cfg = read_config_py()
+            self._send_json({"ok": True, "mode": cfg.get("SYSTEM_MODE", "guard")})
+
         elif path == "/api/process/logs/stream":
             # ── Server-Sent Events (SSE) ──────────────────────────────────
             self.send_response(200)
@@ -477,6 +485,18 @@ class ConfigHandler(BaseHTTPRequestHandler):
                 self._send_json({"ok": True, "updated": list(data.keys())})
             except Exception as e:
                 self._send_json({"error": str(e)}, 500)
+
+        elif path == "/api/mode":
+            mode = str(data.get("mode", "guard")).lower()
+            if mode in ("guard", "tracking"):
+                try:
+                    write_config_py({"SYSTEM_MODE": mode})
+                    print(f"[WebUI] Mode changed to: {mode}")
+                    self._send_json({"ok": True, "mode": mode})
+                except Exception as e:
+                    self._send_json({"error": str(e)}, 500)
+            else:
+                self._send_json({"error": "Invalid mode. Choose 'guard' or 'tracking'."}, 400)
 
         elif path == "/api/esp32cam":
             try:
