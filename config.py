@@ -1,10 +1,10 @@
 # ── Model paths ──────────────────────────────────────────────────────────────
 # Source PyTorch weights (used by export_openvino.py to produce the IR model).
-MODEL_PATH = "yolo11n.pt"
+MODEL_PATH = 'yolo11n.pt'
 
 # OpenVINO IR model directory produced by export_openvino.py.
 # Set to None to fall back to the PyTorch model (no OpenVINO acceleration).
-OPENVINO_MODEL_PATH = "yolo11n_openvino_model"
+OPENVINO_MODEL_PATH = 'yolo11n_openvino_model'
 
 # OpenVINO inference device — used by the OpenVINO runtime at model-load time.
 # NOTE: this is NOT passed to model.track(); Ultralytics receives device="cpu"
@@ -12,17 +12,27 @@ OPENVINO_MODEL_PATH = "yolo11n_openvino_model"
 # "CPU"  – always available, good baseline speed
 # "GPU"  – Intel integrated / discrete GPU (requires GPU drivers)
 # "AUTO" – OpenVINO picks the fastest available device automatically
-OPENVINO_DEVICE = "GPU"
+OPENVINO_DEVICE = 'GPU'
 
 # Camera source: "udp" to stream from ESP32-CAM via UDP, or integer (e.g. 0) for USB webcam
-CAMERA_SOURCE = "udp"
+CAMERA_SOURCE = 'udp'
 
 FRAME_WIDTH = 640
 FRAME_HEIGHT = 480
 
-# Controller config (local PAN/TILT via Arduino serial)
+# ── Video orientation / Camera Flip ───────────────────────────────────────────
+# Flip video along X axis (horizontal mirror).
+# Set to True so that when an object moves left, the gun tracks to the left.
+FLIP_HORIZONTAL = True
+FLIP_VERTICAL = False
+
+# ── Controller config (local PAN/TILT via Arduino serial) ─────────────────────
 CAMERA_CENTER_X = FRAME_WIDTH // 2
 CAMERA_CENTER_Y = FRAME_HEIGHT // 2
+
+# Invert servo direction multipliers if needed
+INVERT_PAN = False
+INVERT_TILT = False
 
 # Dead zone: how close to center (in pixels) counts as "locked on" -> shoot
 CENTER_TOLERANCE_X = 40
@@ -47,7 +57,7 @@ UDP_PORT = 5005
 #              animals or bottles approaching or inside the farm boundary.
 # "tracking" → Bottle Tracking Mode: Tracks bottles anywhere across the full field
 #              of view using pan/tilt servos (no firing).
-SYSTEM_MODE = 'guard'
+SYSTEM_MODE = "tracking"
 
 # ── Farm / Shooting Zone ──────────────────────────────────────────────────────
 # The Farm Region is a compact protected zone (smaller than half the screen).
@@ -67,7 +77,7 @@ FARM_Y2 = 400
 
 # ── Serial port to Arduino gun-controller ────────────────────────────────────
 # Set to None to disable serial (useful for testing without hardware).
-SERIAL_PORT = '/dev/ttyACM0'  # Check your Arduino's device path
+SERIAL_PORT = "/dev/ttyACM0"  # Check your Arduino's device path
 SERIAL_BAUD = 115200
 
 # Servo neutral angles (degrees) – the guncontroller .ino maps these to PWM

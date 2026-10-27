@@ -315,6 +315,10 @@ async def _standalone_runner():
         while True:
             ret, frame = await cam.get_frame_async(timeout=0.5)
             if ret and frame is not None:
+                if getattr(config, "FLIP_HORIZONTAL", False):
+                    frame = cv2.flip(frame, 1)
+                if getattr(config, "FLIP_VERTICAL", False):
+                    frame = cv2.flip(frame, 0)
                 if has_display:
                     try:
                         stats_text = f"FPS: {cam.fps} | ESP32-CAM"

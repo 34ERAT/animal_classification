@@ -176,10 +176,12 @@ class GunSerialController:
         """
         Convert horizontal pixel offset (target_cx - zone_cx) to a pan servo
         angle.  Positive error → target is to the right → increase pan angle.
+        Supports config.INVERT_PAN to invert rotation direction.
         """
+        mult = -1.0 if getattr(config, "INVERT_PAN", False) else 1.0
         half = frame_width / 2.0
         # Map [-half, +half] → [0, 180]
-        angle = config.SERVO_PAN_NEUTRAL + (pixel_error_x / half) * 90.0
+        angle = config.SERVO_PAN_NEUTRAL + mult * (pixel_error_x / half) * 90.0
         return int(max(0, min(180, round(angle))))
 
     @staticmethod
@@ -187,9 +189,11 @@ class GunSerialController:
         """
         Convert vertical pixel offset (target_cy - zone_cy) to a tilt servo
         angle.  Positive error → target is below centre → increase tilt angle.
+        Supports config.INVERT_TILT to invert rotation direction.
         """
+        mult = -1.0 if getattr(config, "INVERT_TILT", False) else 1.0
         half = frame_height / 2.0
-        angle = config.SERVO_TILT_NEUTRAL + (pixel_error_y / half) * 90.0
+        angle = config.SERVO_TILT_NEUTRAL + mult * (pixel_error_y / half) * 90.0
         return int(max(0, min(180, round(angle))))
 
     def close(self):

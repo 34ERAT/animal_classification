@@ -492,6 +492,26 @@
               <span class="range-val" id="tilt-neutral-val">90°</span>
             </div>
           </div>
+          <div class="field">
+            <div class="toggle-row">
+              <span style="font-size:.85rem;font-weight:600">Invert Pan Servo</span>
+              <label class="toggle">
+                <input type="checkbox" id="invert-pan"/>
+                <span class="slider"></span>
+              </label>
+            </div>
+            <div class="field-hint">Reverse left/right pan rotation direction.</div>
+          </div>
+          <div class="field">
+            <div class="toggle-row">
+              <span style="font-size:.85rem;font-weight:600">Invert Tilt Servo</span>
+              <label class="toggle">
+                <input type="checkbox" id="invert-tilt"/>
+                <span class="slider"></span>
+              </label>
+            </div>
+            <div class="field-hint">Reverse up/down tilt rotation direction.</div>
+          </div>
         </div>
         <div class="btn-row">
           <button class="btn btn-primary" onclick="saveSerial()">
@@ -544,6 +564,35 @@
           <div class="field">
             <label>Frame Height (px)</label>
             <input id="frame-h" type="number" min="120" max="1080" step="1" placeholder="480"/>
+          </div>
+        </div>
+
+        <hr class="divider"/>
+
+        <div class="card-title" style="font-size:.88rem">Camera Orientation &amp; Mirroring</div>
+        <div class="info-box">
+          If the gun moves in the opposite direction when targets move horizontally, enabling <strong>Flip Horizontal (Mirror X-Axis)</strong> aligns preview coordinates with physical tracking so left is left and right is right.
+        </div>
+        <div class="card-grid two">
+          <div class="field">
+            <div class="toggle-row">
+              <span style="font-size:.85rem;font-weight:600">Flip Horizontal (Mirror X-Axis)</span>
+              <label class="toggle">
+                <input type="checkbox" id="flip-h" checked/>
+                <span class="slider"></span>
+              </label>
+            </div>
+            <div class="field-hint">Mirrors camera along X axis. When object moves left, turret turns left.</div>
+          </div>
+          <div class="field">
+            <div class="toggle-row">
+              <span style="font-size:.85rem;font-weight:600">Flip Vertical (Y-Axis)</span>
+              <label class="toggle">
+                <input type="checkbox" id="flip-v"/>
+                <span class="slider"></span>
+              </label>
+            </div>
+            <div class="field-hint">Inverts camera vertically if mounted upside down.</div>
           </div>
         </div>
 
@@ -943,13 +992,18 @@ function applyConfig(){
   // Mode
   setModeUI(CFG.SYSTEM_MODE || 'guard');
 
-  // Model
+  // Model & Camera Orientation
   v('model-path', CFG.MODEL_PATH);
   v('ov-model-path', CFG.OPENVINO_MODEL_PATH);
   v('ov-device', CFG.OPENVINO_DEVICE);
   v('camera-source', CFG.CAMERA_SOURCE);
   v('frame-w', CFG.FRAME_WIDTH);
   v('frame-h', CFG.FRAME_HEIGHT);
+  const flipH = document.getElementById('flip-h');
+  if(flipH) flipH.checked = CFG.FLIP_HORIZONTAL !== false;
+  const flipV = document.getElementById('flip-v');
+  if(flipV) flipV.checked = Boolean(CFG.FLIP_VERTICAL);
+
   // Serial
   v('serial-port', CFG.SERIAL_PORT);
   if(CFG.SERIAL_BAUD) v('serial-baud', String(CFG.SERIAL_BAUD));
@@ -957,6 +1011,10 @@ function applyConfig(){
   document.getElementById('pan-neutral-val').textContent = (CFG.SERVO_PAN_NEUTRAL||90)+'°';
   v('tilt-neutral', CFG.SERVO_TILT_NEUTRAL);
   document.getElementById('tilt-neutral-val').textContent = (CFG.SERVO_TILT_NEUTRAL||90)+'°';
+  const invPan = document.getElementById('invert-pan');
+  if(invPan) invPan.checked = Boolean(CFG.INVERT_PAN);
+  const invTilt = document.getElementById('invert-tilt');
+  if(invTilt) invTilt.checked = Boolean(CFG.INVERT_TILT);
   // Network
   v('udp-host', CFG.UDP_HOST);
   v('udp-port', CFG.UDP_PORT);
@@ -1064,6 +1122,8 @@ async function saveSerial(){
     SERIAL_BAUD:       gInt('serial-baud'),
     SERVO_PAN_NEUTRAL: gInt('pan-neutral'),
     SERVO_TILT_NEUTRAL:gInt('tilt-neutral'),
+    INVERT_PAN:        Boolean(document.getElementById('invert-pan')?.checked),
+    INVERT_TILT:       Boolean(document.getElementById('invert-tilt')?.checked),
   };
   const res = await api('POST', '/api/config', data);
   if(res.ok) toast('✅ Serial settings saved to config.py', 'ok');
@@ -1078,6 +1138,8 @@ async function saveModel(){
     CAMERA_SOURCE:      g('camera-source'),
     FRAME_WIDTH:        gInt('frame-w'),
     FRAME_HEIGHT:       gInt('frame-h'),
+    FLIP_HORIZONTAL:    Boolean(document.getElementById('flip-h')?.checked),
+    FLIP_VERTICAL:      Boolean(document.getElementById('flip-v')?.checked),
   };
   const res = await api('POST', '/api/config', data);
   if(res.ok) toast('✅ Model settings saved to config.py', 'ok');

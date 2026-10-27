@@ -400,6 +400,12 @@ class YOLOTracker:
         # Auto-detect any live config updates from the web app
         self._check_config_reload()
 
+        # Apply camera orientation flip (horizontal mirror along X-axis / vertical flip)
+        if getattr(config, "FLIP_HORIZONTAL", False):
+            frame = cv2.flip(frame, 1)
+        if getattr(config, "FLIP_VERTICAL", False):
+            frame = cv2.flip(frame, 0)
+
         mode = str(getattr(config, "SYSTEM_MODE", "guard")).lower()
 
         # In Guard mode, draw the compact farm zone

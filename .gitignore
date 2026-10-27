@@ -4,3 +4,7 @@ runs
 yolo11n_openvino_model
 yolo26n-cls.pt
 test.py
+yolo26n.pt
+yolo26n_openvino_model
+yolo26s_openvino_model
+yolo26s.pt
